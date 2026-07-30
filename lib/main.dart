@@ -4,8 +4,15 @@ import 'theme/app_theme.dart';
 import 'screens/ai_assistant_screen.dart';
 import 'screens/case_tracking_screen.dart';
 import 'screens/research_hub_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(const LepApp());
 }
 
