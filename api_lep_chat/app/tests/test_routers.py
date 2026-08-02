@@ -4,9 +4,18 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.schemas.user import CurrentUser
 from app.services.auth_service import get_current_user
+from app.services.course_service import CourseService, get_course_service
 from app.services.message_service import MessageService, get_message_service
 from app.services.session_service import SessionService, get_session_service
-from app.tests.conftest import FakeAgent, FakeMessageRepository, FakeSessionRepository
+from app.services.user_service import UserProfileService, get_user_profile_service
+from app.tests.conftest import (
+    FakeAgent,
+    FakeCourseAgent,
+    FakeCourseRepository,
+    FakeMessageRepository,
+    FakeSessionRepository,
+    FakeUserRepository,
+)
 
 USER_ONE = CurrentUser(uid="user-1", email="one@example.com")
 USER_TWO = CurrentUser(uid="user-2", email="two@example.com")
@@ -18,10 +27,14 @@ def client():
     message_repo = FakeMessageRepository()
     session_service = SessionService(session_repo, message_repo)
     message_service = MessageService(message_repo, session_service, FakeAgent())
+    user_service = UserProfileService(FakeUserRepository())
+    course_service = CourseService(FakeCourseRepository(), FakeCourseAgent())
 
     app.dependency_overrides[get_current_user] = lambda: USER_ONE
     app.dependency_overrides[get_session_service] = lambda: session_service
     app.dependency_overrides[get_message_service] = lambda: message_service
+    app.dependency_overrides[get_user_profile_service] = lambda: user_service
+    app.dependency_overrides[get_course_service] = lambda: course_service
 
     with TestClient(app) as test_client:
         yield test_client
@@ -125,3 +138,52 @@ def test_auth_required_when_not_overridden():
     with TestClient(app) as unauth_client:
         response = unauth_client.get("/api/v1/sessions")
     assert response.status_code == 401
+
+
+def test_create_and_read_user_profile(client):
+    create_resp = client.post(
+        "/api/v1/users/me",
+        json={"full_name": "Jean-Luc", "username": "jeanluc", "jurisdiction": "Rwanda"},
+    )
+    assert create_resp.status_code == 201
+    body = create_resp.json()
+    assert body["uid"] == USER_ONE.uid
+    assert body["full_name"] == "Jean-Luc"
+
+    read_resp = client.get("/api/v1/users/me")
+    assert read_resp.status_code == 200
+    assert read_resp.json()["username"] == "jeanluc"
+
+
+def test_read_user_profile_404_before_creation(client):
+    response = client.get("/api/v1/users/me")
+    assert response.status_code == 404
+
+
+def test_update_user_profile_partial(client):
+    client.post("/api/v1/users/me", json={"full_name": "Jean-Luc", "username": "jeanluc"})
+
+    patch_resp = client.patch("/api/v1/users/me", json={"username": "jl"})
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["username"] == "jl"
+    assert patch_resp.json()["full_name"] == "Jean-Luc"
+
+
+def test_list_education_tracks(client):
+    response = client.get("/api/v1/education/tracks")
+    assert response.status_code == 200
+    slugs = {t["slug"] for t in response.json()}
+    assert slugs == {"labour-law-101", "business-compliance", "family-law", "land-rights"}
+
+
+def test_get_education_course_returns_five_modules(client):
+    response = client.get("/api/v1/education/courses/labour-law-101")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["track"] == "labour-law-101"
+    assert len(body["modules"]) == 5
+
+
+def test_get_education_course_unknown_track_is_not_found(client):
+    response = client.get("/api/v1/education/courses/not-a-real-track")
+    assert response.status_code == 404

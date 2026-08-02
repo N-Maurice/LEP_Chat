@@ -13,6 +13,7 @@ def _make_config() -> AgentConfig:
         embedding_model="text-embedding-005",
         generation_model="gemini-2.5-flash",
         top_k_chunks=2,
+        course_chunk_limit=10,
         catalog_collection="law_catalog",
         chunks_collection="document_chunks",
     )
@@ -90,6 +91,7 @@ async def test_answer_returns_grounded_content_with_citations():
     assert result.citations == [
         {
             "source": "vat_law.pdf",
+            "quote": "VAT is charged at 18 percent.",
             "law_number": "49",
             "law_year": "2023",
             "gcs_path": "Domestic laws/Tax/vat_law.pdf",

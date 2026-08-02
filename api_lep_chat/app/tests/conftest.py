@@ -3,6 +3,7 @@ tests never touch real Firestore or Vertex AI."""
 
 import pytest
 
+from app.agents.course_agent import CourseModule, GeneratedCourse
 from app.agents.legal_research_agent import AgentAnswer
 from app.schemas.user import CurrentUser
 
@@ -91,11 +92,58 @@ class FakeAgent:
             citations=[
                 {
                     "source": "fake_law.pdf",
+                    "quote": "This is a fake excerpt of the law text used for testing.",
                     "law_number": "1",
                     "law_year": "2020",
                     "gcs_path": "fake/fake_law.pdf",
                     "domain": "Tax",
                 }
+            ],
+        )
+
+
+class FakeUserRepository:
+    def __init__(self):
+        self._store: dict[str, dict] = {}
+
+    async def upsert(self, uid: str, **fields) -> dict:
+        existing = self._store.get(uid, {"uid": uid, "created_at": None})
+        existing.update(fields)
+        existing["uid"] = uid
+        existing["updated_at"] = None
+        self._store[uid] = existing
+        return dict(existing)
+
+    async def get(self, uid: str) -> dict | None:
+        doc = self._store.get(uid)
+        return dict(doc) if doc else None
+
+
+class FakeCourseRepository:
+    def __init__(self):
+        self._store: dict[str, dict] = {}
+
+    async def get(self, track: str) -> dict | None:
+        doc = self._store.get(track)
+        return dict(doc) if doc else None
+
+    async def save(self, track: str, course: dict) -> None:
+        self._store[track] = {**course, "generated_at": None}
+
+
+class FakeCourseAgent:
+    def __init__(self):
+        self.calls: list[str] = []
+
+    async def generate(self, track: str) -> GeneratedCourse:
+        self.calls.append(track)
+        return GeneratedCourse(
+            track=track,
+            title=f"Generated course for {track}",
+            description="A fake generated description.",
+            modules=[
+                CourseModule(title=f"Module {i}", summary=f"Summary {i}", citations=[])
+                for i in range(1, 6)
             ],
         )
 
