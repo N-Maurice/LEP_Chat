@@ -11,6 +11,7 @@ class MessageRole(str, Enum):
 
 class Citation(BaseModel):
     source: str
+    quote: str | None = None
     law_number: str | None = None
     law_year: str | None = None
     gcs_path: str | None = None
