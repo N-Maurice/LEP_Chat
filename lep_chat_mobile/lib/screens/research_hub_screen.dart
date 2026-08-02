@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../models/models.dart';
 import '../data/mock_data.dart';
 import '../widgets/shared_widgets.dart';
+import 'regional_law_explorer_screen.dart';
 
 /// Screen 3 — Legal Research Hub.
 /// Data source: [researchResults] / [researchCategories] in
@@ -19,61 +20,60 @@ class ResearchHubScreen extends StatefulWidget {
 class _ResearchHubScreenState extends State<ResearchHubScreen> {
   String _activeCategory = researchCategories.first;
 
+  void _comingSoon(String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$feature is in the build queue — coming soon.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _comingSoon('Saving custom searches'),
+        backgroundColor: AppColors.oxblood,
+        child: const Icon(LucideIcons.plus, color: AppColors.paper),
+      ),
       body: SafeArea(
         child: Column(
           children: [
             const ScreenHeader(title: 'Legal Ecosystem', meta: 'Legal Research Hub'),
             Expanded(
-              child: Stack(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                 children: [
-                  ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-                    children: [
-                      const _SearchRow(),
-                      const SizedBox(height: 16),
-                      const SectionLabel('Popular jurisdictions'),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 38,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          children: [
-                            for (final category in researchCategories)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: _CategoryChip(
-                                  label: category,
-                                  active: category == _activeCategory,
-                                  onTap: () => setState(() => _activeCategory = category),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Showing $researchResultCount results for "$researchQuery"',
-                        style: AppText.body(size: 11.5, color: AppColors.slate),
-                      ),
-                      const SizedBox(height: 12),
-                      for (final result in researchResults) _ResultCard(result: result),
-                      const SizedBox(height: 4),
-                      const _ExplorerCard(),
-                    ],
-                  ),
-                  Positioned(
-                    right: 4,
-                    bottom: 8,
-                    child: FloatingActionButton(
-                      onPressed: () {},
-                      backgroundColor: AppColors.oxblood,
-                      child: const Icon(LucideIcons.plus, color: AppColors.paper),
+                  _SearchRow(onJurisdictionTap: () => _comingSoon('Switching jurisdictions')),
+                  const SizedBox(height: 16),
+                  const SectionLabel('Popular jurisdictions'),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 38,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        for (final category in researchCategories)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: _CategoryChip(
+                              label: category,
+                              active: category == _activeCategory,
+                              onTap: () => setState(() => _activeCategory = category),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Showing $researchResultCount results for "$researchQuery"',
+                    style: AppText.body(size: 11.5, color: AppColors.slate),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final result in researchResults)
+                    _ResultCard(result: result, onComingSoon: _comingSoon),
+                  const SizedBox(height: 4),
+                  const _ExplorerCard(),
                 ],
               ),
             ),
@@ -85,7 +85,8 @@ class _ResearchHubScreenState extends State<ResearchHubScreen> {
 }
 
 class _SearchRow extends StatelessWidget {
-  const _SearchRow();
+  final VoidCallback onJurisdictionTap;
+  const _SearchRow({required this.onJurisdictionTap});
 
   @override
   Widget build(BuildContext context) {
@@ -126,21 +127,25 @@ class _SearchRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.paperDim,
-            border: Border.all(color: AppColors.line),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(researchJurisdiction, style: AppText.body(size: 11.5, weight: FontWeight.w700)),
-              const SizedBox(width: 4),
-              const Icon(LucideIcons.chevronDown, size: 14, color: AppColors.ink),
-            ],
+        InkWell(
+          onTap: onJurisdictionTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.paperDim,
+              border: Border.all(color: AppColors.line),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(researchJurisdiction, style: AppText.body(size: 11.5, weight: FontWeight.w700)),
+                const SizedBox(width: 4),
+                const Icon(LucideIcons.chevronDown, size: 14, color: AppColors.ink),
+              ],
+            ),
           ),
         ),
       ],
@@ -177,7 +182,8 @@ class _CategoryChip extends StatelessWidget {
 
 class _ResultCard extends StatelessWidget {
   final ResearchResult result;
-  const _ResultCard({required this.result});
+  final void Function(String feature) onComingSoon;
+  const _ResultCard({required this.result, required this.onComingSoon});
 
   @override
   Widget build(BuildContext context) {
@@ -195,19 +201,22 @@ class _ResultCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(LucideIcons.landmark, size: 13, color: AppColors.slate),
-                  const SizedBox(width: 5),
-                  Flexible(
-                    child: Text(
-                      result.institution,
-                      style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.slate),
-                      overflow: TextOverflow.ellipsis,
+              Expanded(
+                child: Row(
+                  children: [
+                    const Icon(LucideIcons.landmark, size: 13, color: AppColors.slate),
+                    const SizedBox(width: 5),
+                    Flexible(
+                      child: Text(
+                        result.institution,
+                        style: AppText.body(size: 11, weight: FontWeight.w700, color: AppColors.slate),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               LepPill(label: result.tag, variant: PillVariant.tag),
             ],
           ),
@@ -254,7 +263,7 @@ class _ResultCard extends StatelessWidget {
           Row(
             children: [
               ElevatedButton.icon(
-                onPressed: () {},
+                onPressed: () => onComingSoon('Reading the original source'),
                 icon: const Icon(LucideIcons.fileText, size: 14, color: AppColors.paper),
                 label: Text(
                   'Read original',
@@ -268,9 +277,9 @@ class _ResultCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              const _OutlineIconButton(icon: LucideIcons.download),
+              _OutlineIconButton(icon: LucideIcons.download, onTap: () => onComingSoon('Downloading results')),
               const SizedBox(width: 8),
-              const _OutlineIconButton(icon: LucideIcons.bookmark),
+              _OutlineIconButton(icon: LucideIcons.bookmark, onTap: () => onComingSoon('Bookmarking results')),
             ],
           ),
         ],
@@ -281,16 +290,21 @@ class _ResultCard extends StatelessWidget {
 
 class _OutlineIconButton extends StatelessWidget {
   final IconData icon;
-  const _OutlineIconButton({required this.icon});
+  final VoidCallback onTap;
+  const _OutlineIconButton({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 34,
-      height: 34,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(10)),
-      child: Icon(icon, size: 15, color: AppColors.inkSoft),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 34,
+        height: 34,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(border: Border.all(color: AppColors.line), borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, size: 15, color: AppColors.inkSoft),
+      ),
     );
   }
 }
@@ -324,7 +338,9 @@ class _ExplorerCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           ElevatedButton.icon(
-            onPressed: () {},
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RegionalLawExplorerScreen()),
+            ),
             icon: const Icon(LucideIcons.map, size: 15, color: AppColors.ink),
             label: Text('Open full map', style: AppText.body(size: 12, weight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(

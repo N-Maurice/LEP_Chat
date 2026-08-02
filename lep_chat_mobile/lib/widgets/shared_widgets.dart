@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_theme.dart';
-import '../models/models.dart';
+import '../models/api_models.dart';
 
 /// Reusable pieces shared across every LEP screen so the "Docket & Ledger"
 /// visual language — the citation block, verified stamp, and screen header —
@@ -74,14 +74,15 @@ class VerifiedStamp extends StatelessWidget {
 }
 
 /// The signature element: a ledger-style rule + brass corner tag that wraps
-/// every piece of sourced legal content — used by the assistant screen and
-/// the research hub alike so both read as "verifiable law" the same way.
-class CitationBlockWidget extends StatelessWidget {
-  final Citation citation;
-  const CitationBlockWidget({super.key, required this.citation});
+/// every piece of sourced legal content returned by the AI Legal Assistant —
+/// backed by the agent's real citations (api_lep_chat/app/agents), not mock data.
+class ApiCitationBlockWidget extends StatelessWidget {
+  final ApiCitation citation;
+  const ApiCitationBlockWidget({super.key, required this.citation});
 
   @override
   Widget build(BuildContext context) {
+    final hasLawRef = citation.lawNumber != null && citation.lawYear != null;
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
@@ -108,49 +109,37 @@ class CitationBlockWidget extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '\u201c${citation.quote}\u201d',
-            style: AppText
-                .display(size: 13.5, weight: FontWeight.w400, style: FontStyle.italic)
-                .copyWith(height: 1.5),
-          ),
+          if (citation.quote != null && citation.quote!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              '\u201c${citation.quote}\u201d',
+              style: AppText
+                  .display(size: 13.5, weight: FontWeight.w400, style: FontStyle.italic)
+                  .copyWith(height: 1.5),
+            ),
+          ],
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.only(top: 8),
             decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: AppColors.line)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Flexible(
-                  child: Text(
-                    citation.source,
-                    style: AppText.mono(size: 11, weight: FontWeight.w600, color: AppColors.oxbloodDeep),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Read full article', style: AppText.body(size: 11, weight: FontWeight.w600)),
-                    const SizedBox(width: 4),
-                    const Icon(LucideIcons.externalLink, size: 12, color: AppColors.ink),
-                  ],
-                ),
-              ],
+            child: Text(
+              citation.source,
+              style: AppText.mono(size: 11, weight: FontWeight.w600, color: AppColors.oxbloodDeep),
             ),
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              LepPill(label: 'Jurisdiction: ${citation.jurisdiction}'),
-              LepPill(label: 'Verified ${citation.verifiedYear}', variant: PillVariant.brass),
-            ],
-          ),
+          if (hasLawRef || citation.domain != null) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                if (hasLawRef) LepPill(label: 'Law No. ${citation.lawNumber} of ${citation.lawYear}'),
+                if (citation.domain != null) LepPill(label: citation.domain!, variant: PillVariant.brass),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -173,6 +162,7 @@ class ScreenHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
       decoration: const BoxDecoration(
@@ -182,6 +172,24 @@ class ScreenHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (canPop) ...[
+            InkWell(
+              onTap: () => Navigator.of(context).pop(),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.paper,
+                  border: Border.all(color: AppColors.line),
+                ),
+                child: const Icon(LucideIcons.arrowLeft, size: 17, color: AppColors.ink),
+              ),
+            ),
+            const SizedBox(width: 10),
+          ],
           Container(
             width: 38,
             height: 38,
@@ -242,6 +250,187 @@ class SectionLabel extends StatelessWidget {
     return Text(
       text.toUpperCase(),
       style: AppText.mono(size: 10.5, weight: FontWeight.w600, color: AppColors.slate, letterSpacing: 0.08),
+    );
+  }
+}
+
+/// Labeled text input matching the signup/sign-in forms in the mockup:
+/// an uppercase mono label above a paper-bordered field.
+class LepFormField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final bool obscureText;
+  final TextInputType? keyboardType;
+  final Widget? suffixIcon;
+  final String? Function(String?)? validator;
+
+  const LepFormField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.obscureText = false,
+    this.keyboardType,
+    this.suffixIcon,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(label),
+        const SizedBox(height: 6),
+        TextFormField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          validator: validator,
+          style: AppText.body(size: 13.5),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: AppText.body(size: 13.5, color: AppColors.slate),
+            filled: true,
+            fillColor: AppColors.paper,
+            suffixIcon: suffixIcon,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.line),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.line),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: AppColors.oxblood, width: 1.4),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.redAccent),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Full-width primary button in oxblood, used for the main CTA on every
+/// auth screen (Get Started, Sign In, Verify Identity...).
+class LepPrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final IconData? icon;
+
+  const LepPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: loading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.oxblood,
+          foregroundColor: AppColors.paper,
+          disabledBackgroundColor: AppColors.oxblood.withValues(alpha: 0.6),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 0,
+        ),
+        child: loading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: AppColors.paper),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(label, style: AppText.body(size: 14.5, weight: FontWeight.w700, color: AppColors.paper)),
+                  if (icon != null) ...[
+                    const SizedBox(width: 8),
+                    Icon(icon, size: 17, color: AppColors.paper),
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// Full-width secondary/outline button — "I already have an account",
+/// "Sign in with Google", etc.
+class LepSecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+
+  const LepSecondaryButton({super.key, required this.label, required this.onPressed, this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.line),
+          backgroundColor: AppColors.paper,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 17, color: AppColors.oxblood),
+              const SizedBox(width: 8),
+            ],
+            Text(label, style: AppText.body(size: 14, weight: FontWeight.w700, color: AppColors.oxbloodDeep)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline error banner shown under forms when an auth/API call fails.
+class LepErrorBanner extends StatelessWidget {
+  final String message;
+  const LepErrorBanner({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBE9E9),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE3A8A8)),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.triangleAlert, size: 16, color: AppColors.oxbloodDeep),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(message, style: AppText.body(size: 12.5, color: AppColors.oxbloodDeep)),
+          ),
+        ],
+      ),
     );
   }
 }
