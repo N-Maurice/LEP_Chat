@@ -28,3 +28,31 @@ QUESTION:
 
 ANSWER (with inline [Source N] citations):
 """
+
+COURSE_GENERATION_PROMPT = """You are building a self-study legal education course for the "{track_label}"
+track, for citizens learning about Rwandan law. Below are numbered source excerpts pulled from the actual
+ingested legal document corpus for this track.
+
+Using ONLY these sources — do not invent facts, laws, or content that isn't grounded in them — organize
+them into a course with EXACTLY 5 modules. Each module should cover a distinct, coherent theme found in the
+sources (don't just split them arbitrarily). If the sources only really support fewer than 5 distinct themes,
+it's fine for a module to draw on the same handful of sources as another as long as its angle is genuinely
+different — but never fabricate a theme that isn't backed by the sources.
+
+SOURCES:
+{context}
+
+Respond with ONLY a JSON object, no other text, in this exact format:
+{{
+  "course_title": "...",
+  "course_description": "one or two sentences",
+  "modules": [
+    {{
+      "title": "...",
+      "summary": "2-4 sentences explaining what this module covers, grounded in its sources",
+      "source_numbers": [1, 3]
+    }}
+  ]
+}}
+The "modules" array must have exactly 5 entries. "source_numbers" must reference the [Source N] numbers above.
+"""
