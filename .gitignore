@@ -56,6 +56,7 @@ api_lep_chat/app/__pycache__/
 api_lep_chat/app/**/__pycache__/
 api_lep_chat/app/.pytest_cache/
 api_lep_chat/app/.venv/
+api_lep_chat/app/*.json
 
 # Firebase
 firebase-debug.log

@@ -13,6 +13,7 @@ class AgentConfig:
     embedding_model: str
     generation_model: str
     top_k_chunks: int
+    course_chunk_limit: int
     catalog_collection: str
     chunks_collection: str
 
@@ -24,6 +25,7 @@ class AgentConfig:
             embedding_model=settings.embedding_model,
             generation_model=settings.generation_model,
             top_k_chunks=settings.top_k_chunks,
+            course_chunk_limit=settings.course_chunk_limit,
             catalog_collection=settings.firestore_catalog_collection,
             chunks_collection=settings.firestore_chunks_collection,
         )
