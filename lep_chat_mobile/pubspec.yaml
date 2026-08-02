@@ -8,21 +8,34 @@ environment:
   flutter: '>=3.10.0'
 
 dependencies:
+  firebase_auth: ^6.5.6
+  firebase_core: ^4.12.1
   flutter:
     sdk: flutter
   # Type system: Fraunces (display) / IBM Plex Sans (body) / IBM Plex Mono (data)
   google_fonts: ^6.2.1
   # Icon set matching the web prototype 1:1 (Scale, ShieldCheck, BookOpen, etc.)
+  google_sign_in: ^7.2.0
+  http: ^1.6.0
   lucide_icons_flutter: ^3.0.11
+  provider: ^6.1.5+1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  firebase_auth_mocks: ^0.15.2
+  mocktail: ^1.0.5
 
 flutter:
   uses-material-design: true
+  assets:
+    - .env.json
 
 # NOTE: run `flutter pub add google_fonts lucide_icons` if the pinned
 # versions above are behind pub.dev's current release when you build this,
 # then `flutter pub get`.
+#
+# .env.json holds API_BASE_URL — point it at localhost for local dev, or the
+# deployed backend URL for staging/prod. Not gitignored: it carries no secrets,
+# only a base URL, and is meant to be committed/edited per environment.
