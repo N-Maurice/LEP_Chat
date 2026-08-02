@@ -5,11 +5,11 @@
         "default": {
           "projectId": "lep-chat",
           "appId": "1:683434123196:android:efd132b9f52eab524d55b9",
-          "fileOutput": "android/app/google-services.json"
+          "fileOutput": "lep_chat_mobile/android/app/google-services.json"
         }
       },
       "dart": {
-        "lib/firebase_options.dart": {
+        "lep_chat_mobile/lib/firebase_options.dart": {
           "projectId": "lep-chat",
           "configurations": {
             "android": "1:683434123196:android:efd132b9f52eab524d55b9",
@@ -24,7 +24,7 @@
   },
   "functions": [
     {
-      "source": "functions",
+      "source": "api_lep_chat/functions",
       "codebase": "default",
       "disallowLegacyRuntimeConfig": true,
       "ignore": [

@@ -30,8 +30,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
-/coverage/
+/lep_chat_mobile/build/
+/lep_chat_mobile/coverage/
 
 # Symbolication related
 app.*.symbols
@@ -40,16 +40,24 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+/lep_chat_mobile/android/app/debug
+/lep_chat_mobile/android/app/profile
+/lep_chat_mobile/android/app/release
 
 # Functions
-functions/node_modules/
-functions/lib/
-functions/.env
-functions/*.log
+api_lep_chat/functions/node_modules/
+api_lep_chat/functions/lib/
+api_lep_chat/functions/.env
+api_lep_chat/functions/*.log
+
+# FastAPI app
+api_lep_chat/app/.env
+api_lep_chat/app/__pycache__/
+api_lep_chat/app/**/__pycache__/
+api_lep_chat/app/.pytest_cache/
+api_lep_chat/app/.venv/
 
 # Firebase
 firebase-debug.log
 .firebase/
+push.sh
