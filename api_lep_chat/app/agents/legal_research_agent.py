@@ -21,6 +21,7 @@ from google.cloud.firestore_v1.vector import Vector
 
 from app.agents.config import AgentConfig
 from app.agents.prompts import DOMAIN_GUESS_PROMPT, GROUNDED_ANSWER_PROMPT
+from app.agents.utils import excerpt, parse_json_response
 from app.core.config import get_settings
 from app.db.firestore_client import get_firestore_client
 
@@ -68,15 +69,8 @@ class LegalResearchAgent:
             model=self._config.generation_model,
             contents=prompt,
         )
-        text = (response.text or "").strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        try:
-            return json.loads(text.strip())
-        except json.JSONDecodeError:
-            return {"category": None, "domain": None, "subdomain": None}
+        parsed = parse_json_response(response.text or "")
+        return parsed or {"category": None, "domain": None, "subdomain": None}
 
     async def _embed_question(self, question: str) -> list[float]:
         response = await self._genai.aio.models.embed_content(
@@ -116,8 +110,8 @@ class LegalResearchAgent:
         )
         return response.text or ""
 
-    @staticmethod
-    def _citations_from_chunks(chunks: list[dict]) -> list[dict]:
+    @classmethod
+    def _citations_from_chunks(cls, chunks: list[dict]) -> list[dict]:
         seen: set[str] = set()
         citations = []
         for c in chunks:
@@ -128,6 +122,7 @@ class LegalResearchAgent:
             citations.append(
                 {
                     "source": c.get("law_title") or ref,
+                    "quote": excerpt(c.get("text", "")),
                     "law_number": c.get("law_number"),
                     "law_year": c.get("law_year"),
                     "gcs_path": c.get("gcs_path"),
