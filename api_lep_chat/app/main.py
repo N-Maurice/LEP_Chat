@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.firebase import init_firebase_app
 from app.middleware.cors import setup_cors
-from app.routers import auth, messages, sessions
+from app.routers import auth, education, messages, sessions, users
 
 settings = get_settings()
 
@@ -32,5 +32,7 @@ async def health_check() -> dict:
 
 
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
+app.include_router(users.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(messages.router, prefix=settings.api_v1_prefix)
+app.include_router(education.router, prefix=settings.api_v1_prefix)
