@@ -3,43 +3,12 @@ import 'package:flutter/material.dart';
 /// Data contracts for the LEP app.
 /// These mirror the shape of the future REST responses so screens can be
 /// pointed at live endpoints later without changing any widget code:
-///   ChatMessage    -> GET /api/v1/assistant/sessions/:id
 ///   PrimaryCase    -> GET /api/v1/cases/:id
 ///   ResearchResult -> GET /api/v1/research/search?q=&jurisdiction=
-
-enum MessageRole { assistant, user }
-
-class Citation {
-  final String quote;
-  final String source;
-  final String jurisdiction;
-  final int verifiedYear;
-  final String url;
-
-  const Citation({
-    required this.quote,
-    required this.source,
-    required this.jurisdiction,
-    required this.verifiedYear,
-    required this.url,
-  });
-}
-
-class ChatMessage {
-  final String id;
-  final MessageRole role;
-  final String time;
-  final String content;
-  final Citation? citation;
-
-  const ChatMessage({
-    required this.id,
-    required this.role,
-    required this.time,
-    required this.content,
-    this.citation,
-  });
-}
+///
+/// The AI Assistant screen is wired to the real backend already — see
+/// models/api_models.dart (ApiMessage, ApiCitation, ApiSession) for its
+/// data contracts instead.
 
 class QuickAction {
   final String id;
