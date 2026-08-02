@@ -1,0 +1,40 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "lep-chat",
+          "appId": "1:683434123196:android:efd132b9f52eab524d55b9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "lep-chat",
+          "configurations": {
+            "android": "1:683434123196:android:efd132b9f52eab524d55b9",
+            "ios": "1:683434123196:ios:c13ca1c10ed5419f4d55b9",
+            "macos": "1:683434123196:ios:c13ca1c10ed5419f4d55b9",
+            "web": "1:683434123196:web:653f2b305a02da234d55b9",
+            "windows": "1:683434123196:web:19f162f695fd22654d55b9"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "runtime": "python314"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@genkit-ai/ai": "^1.40.1",
+    "@genkit-ai/firebase": "^1.40.1",
+    "@genkit-ai/vertexai": "^1.40.1",
+    "firebase-admin": "^14.2.0",
+    "genkit": "^1.40.1"
+  },
+  "allowScripts": {
+    "@firebase/util@1.15.1": true,
+    "@google/genai@1.52.0": true,
+    "protobufjs@7.6.5": true
+  }
+}

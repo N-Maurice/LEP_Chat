@@ -1,0 +1,28 @@
+name: lep_app
+description: "LEP — Legal Ecosystem Platform (Flutter)"
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Type system: Fraunces (display) / IBM Plex Sans (body) / IBM Plex Mono (data)
+  google_fonts: ^6.2.1
+  # Icon set matching the web prototype 1:1 (Scale, ShieldCheck, BookOpen, etc.)
+  lucide_icons_flutter: ^3.0.11
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+# NOTE: run `flutter pub add google_fonts lucide_icons` if the pinned
+# versions above are behind pub.dev's current release when you build this,
+# then `flutter pub get`.
