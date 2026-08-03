@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../core/auth_controller.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
-import 'legal_education_screen.dart';
 import 'report_violation_screen.dart';
 
 /// Screen 0 — Home dashboard. Quick actions jump either to a sibling bottom-nav
@@ -15,9 +14,9 @@ import 'report_violation_screen.dart';
 /// "coming soon" toast rather than a dead tap.
 class HomeScreen extends StatelessWidget {
   final ValueChanged<int> onNavigateToTab;
-  final VoidCallback onOpenAssistant;
+  final VoidCallback onOpenCommunity;
 
-  const HomeScreen({super.key, required this.onNavigateToTab, required this.onOpenAssistant});
+  const HomeScreen({super.key, required this.onNavigateToTab, required this.onOpenCommunity});
 
   void _comingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -33,12 +32,8 @@ class HomeScreen extends StatelessWidget {
     final greeting = hour < 12 ? 'Good morning' : (hour < 18 ? 'Good afternoon' : 'Good evening');
 
     final quickActions = <_QuickActionItem>[
-      _QuickActionItem(
-        label: 'Know Your Rights',
-        icon: LucideIcons.shieldCheck,
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LegalEducationScreen())),
-      ),
-      _QuickActionItem(label: 'Search Laws', icon: LucideIcons.search, onTap: () => onNavigateToTab(1)),
+      _QuickActionItem(label: 'Know Your Rights', icon: LucideIcons.shieldCheck, onTap: () => onNavigateToTab(3)),
+      _QuickActionItem(label: 'Search Laws', icon: LucideIcons.search, onTap: () => onNavigateToTab(3)),
       _QuickActionItem(
         label: 'Report a Violation',
         icon: LucideIcons.circleAlert,
@@ -46,19 +41,14 @@ class HomeScreen extends StatelessWidget {
       ),
       _QuickActionItem(label: 'Track a Case', icon: LucideIcons.target, onTap: () => onNavigateToTab(2)),
       _QuickActionItem(label: 'Find Legal Help', icon: LucideIcons.headset, onTap: () => _comingSoon(context, 'Find Legal Help')),
-      _QuickActionItem(
-        label: 'Legal Education',
-        icon: LucideIcons.graduationCap,
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LegalEducationScreen())),
-      ),
-      _QuickActionItem(label: 'Community Discussions', icon: LucideIcons.users, onTap: () => onNavigateToTab(3)),
-      _QuickActionItem(label: 'Book Consultation', icon: LucideIcons.calendarCheck, onTap: () => _comingSoon(context, 'Book Consultation')),
+      _QuickActionItem(label: 'Legal Education', icon: LucideIcons.graduationCap, onTap: () => onNavigateToTab(3)),
+      _QuickActionItem(label: 'Community Discussions', icon: LucideIcons.users, onTap: onOpenCommunity),
     ];
 
     return Scaffold(
       backgroundColor: AppColors.paper,
       floatingActionButton: FloatingActionButton(
-        onPressed: onOpenAssistant,
+        onPressed: () => onNavigateToTab(1),
         backgroundColor: AppColors.oxblood,
         child: const Icon(LucideIcons.messageCircle, color: AppColors.paper),
       ),
@@ -224,20 +214,14 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            const _TrendingCard(
-              badge: 'UPDATE',
-              title: 'New Labour Law Updates 2024',
-              summary: "Understand the critical changes in Rwanda's latest employment regulations.",
-              meta: 'Oct 24, 2023',
-              icon: LucideIcons.fileText,
-            ),
-            const SizedBox(height: 12),
-            const _TrendingCard(
-              badge: 'GUIDE',
-              title: 'Land Dispute Resolution',
-              summary: 'A step-by-step guide for landowners navigating boundary disagreements.',
-              meta: '1.2k views',
-              icon: LucideIcons.map,
+            SizedBox(
+              height: 236,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _trendingTopics.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 12),
+                itemBuilder: (context, i) => _TrendingCard(topic: _trendingTopics[i]),
+              ),
             ),
           ],
         ),
@@ -245,6 +229,59 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
+
+class _TrendingTopic {
+  final String badge;
+  final String title;
+  final String summary;
+  final String meta;
+  final IconData icon;
+  const _TrendingTopic({
+    required this.badge,
+    required this.title,
+    required this.summary,
+    required this.meta,
+    required this.icon,
+  });
+}
+
+const _trendingTopics = <_TrendingTopic>[
+  _TrendingTopic(
+    badge: 'UPDATE',
+    title: 'New Labour Law Updates 2024',
+    summary: "Understand the critical changes in Rwanda's latest employment regulations.",
+    meta: 'Oct 24, 2023',
+    icon: LucideIcons.fileText,
+  ),
+  _TrendingTopic(
+    badge: 'GUIDE',
+    title: 'Land Dispute Resolution',
+    summary: 'A step-by-step guide for landowners navigating boundary disagreements.',
+    meta: '1.2k views',
+    icon: LucideIcons.map,
+  ),
+  _TrendingTopic(
+    badge: 'GUIDE',
+    title: 'Business Compliance Checklist',
+    summary: 'What every registered company needs to file this quarter to stay compliant.',
+    meta: '860 views',
+    icon: LucideIcons.building2,
+  ),
+  _TrendingTopic(
+    badge: 'RIGHTS',
+    title: 'Protections Against GBV',
+    summary: 'Know the legal protections available and how to report incidents safely.',
+    meta: '2.1k views',
+    icon: LucideIcons.handHeart,
+  ),
+  _TrendingTopic(
+    badge: 'UPDATE',
+    title: 'Family Law: Custody Rights',
+    summary: 'Recent amendments affecting child custody arrangements after separation.',
+    meta: 'Sep 30, 2023',
+    icon: LucideIcons.users,
+  ),
+];
 
 class _QuickActionItem {
   final String label;
@@ -295,23 +332,13 @@ class _QuickActionTile extends StatelessWidget {
 }
 
 class _TrendingCard extends StatelessWidget {
-  final String badge;
-  final String title;
-  final String summary;
-  final String meta;
-  final IconData icon;
-
-  const _TrendingCard({
-    required this.badge,
-    required this.title,
-    required this.summary,
-    required this.meta,
-    required this.icon,
-  });
+  final _TrendingTopic topic;
+  const _TrendingCard({required this.topic});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: 240,
       decoration: BoxDecoration(
         color: AppColors.paper,
         borderRadius: BorderRadius.circular(14),
@@ -321,10 +348,11 @@ class _TrendingCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Thumbnail placeholder — swap for a real Image.network/asset once
+          // article artwork is available; the icon + gradient stand in for now.
           Container(
-            height: 100,
+            height: 96,
             width: double.infinity,
-            alignment: Alignment.topRight,
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [AppColors.ink, AppColors.inkSoft],
@@ -334,32 +362,52 @@ class _TrendingCard extends StatelessWidget {
             ),
             child: Stack(
               children: [
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  top: 0,
-                  child: Center(child: Icon(icon, size: 30, color: AppColors.paper.withValues(alpha: 0.3))),
+                Positioned.fill(
+                  child: Center(
+                    child: Icon(LucideIcons.image, size: 26, color: AppColors.paper.withValues(alpha: 0.25)),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Center(
+                    child: Icon(topic.icon, size: 30, color: AppColors.paper.withValues(alpha: 0.45)),
+                  ),
                 ),
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: LepPill(label: badge, variant: PillVariant.tag),
+                  child: LepPill(label: topic.badge, variant: PillVariant.tag),
                 ),
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppText.display(size: 14.5, weight: FontWeight.w700)),
-                const SizedBox(height: 4),
-                Text(summary, style: AppText.body(size: 12, color: AppColors.inkSoft).copyWith(height: 1.4)),
-                const SizedBox(height: 8),
-                Text(meta, style: AppText.mono(size: 10.5, color: AppColors.slate)),
-              ],
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        topic.title,
+                        style: AppText.display(size: 14, weight: FontWeight.w700),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        topic.summary,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppText.body(size: 11.5, color: AppColors.inkSoft).copyWith(height: 1.4),
+                      ),
+                    ],
+                  ),
+                  Text(topic.meta, style: AppText.mono(size: 10.5, color: AppColors.slate)),
+                ],
+              ),
             ),
           ),
         ],
