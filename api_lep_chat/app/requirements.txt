@@ -1,6 +1,7 @@
 # Web framework
 fastapi==0.136.1
 uvicorn[standard]==0.47.0
+python-multipart==0.0.32
 
 # Validation / settings
 pydantic==2.13.4
@@ -10,6 +11,7 @@ python-dotenv==1.0.1
 # Auth + data store (Firebase project: lep-chat)
 firebase-admin==6.6.0
 google-cloud-firestore==2.19.0
+google-cloud-storage==3.13.0
 
 # RAG agent (Vertex AI Gemini + embeddings, same models used by ../gcs/ingest_v2.py)
 google-genai==1.75.0

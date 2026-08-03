@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     google_cloud_project: str = Field(default="lep-chat", alias="GOOGLE_CLOUD_PROJECT")
     google_cloud_location: str = Field(default="us-central1", alias="GOOGLE_CLOUD_LOCATION")
 
+    # GCS buckets. Corpus bucket holds the ingested law PDFs (gcs/ingest_v2.py);
+    # evidence bucket holds citizen-submitted case/report attachments.
+    gcs_corpus_bucket: str = Field(default="lep_chat_case_documents_gcs", alias="GCS_CORPUS_BUCKET")
+    gcs_evidence_bucket: str = Field(default="lep_chat_case_documents_gcs", alias="GCS_EVIDENCE_BUCKET")
+
     # Path to a Firebase service account JSON. Leave empty to fall back to
     # Application Default Credentials (gcloud auth application-default login).
     firebase_credentials_path: str | None = Field(default=None, alias="FIREBASE_CREDENTIALS_PATH")
@@ -36,6 +41,8 @@ class Settings(BaseSettings):
     firestore_catalog_collection: str = Field(default="law_catalog", alias="FIRESTORE_CATALOG_COLLECTION")
     firestore_users_collection: str = Field(default="users", alias="FIRESTORE_USERS_COLLECTION")
     firestore_courses_collection: str = Field(default="generated_courses", alias="FIRESTORE_COURSES_COLLECTION")
+    firestore_cases_collection: str = Field(default="cases", alias="FIRESTORE_CASES_COLLECTION")
+    firestore_conversations_collection: str = Field(default="conversations", alias="FIRESTORE_CONVERSATIONS_COLLECTION")
 
     # Agent / Gen AI models (must match the models used by gcs/ingest_v2.py to embed the corpus)
     embedding_model: str = Field(default="text-embedding-005", alias="EMBEDDING_MODEL")
@@ -43,7 +50,9 @@ class Settings(BaseSettings):
     top_k_chunks: int = Field(default=8, alias="TOP_K_CHUNKS")
     # More chunks than a single Q&A needs — a 5-module course needs enough source
     # material to partition into 5 distinct, non-overlapping themes.
-    course_chunk_limit: int = Field(default=30, alias="COURSE_CHUNK_LIMIT")
+    # Raised from 30 -> 60 so generated courses draw on more of the ingested corpus per
+    # track, producing longer, more thorough modules instead of thin summaries.
+    course_chunk_limit: int = Field(default=60, alias="COURSE_CHUNK_LIMIT")
 
     # API
     api_v1_prefix: str = Field(default="/api/v1", alias="API_V1_PREFIX")
