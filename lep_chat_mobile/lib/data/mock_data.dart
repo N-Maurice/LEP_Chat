@@ -1,50 +1,12 @@
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/models.dart';
 
-/// Mock data shaped like future API responses.
-/// Replace each constant below with a real repository/fetch call once the
-/// backend is ready — screen widgets read straight from these, so nothing
-/// else needs to change.
-///   assistantMessages / assistantQuickActions -> assistant session endpoint
-///   primaryCase / otherCases / activeCaseCount -> case tracking endpoint
-///   researchResults / researchCategories       -> legal research endpoint
-
-const List<ChatMessage> assistantMessages = [
-  ChatMessage(
-    id: 'm1',
-    role: MessageRole.assistant,
-    time: '10:02 AM',
-    content:
-        "Greetings. I am your specialized AI Legal Assistant. How can I assist you with Rwandan law or international legal frameworks today?",
-  ),
-  ChatMessage(
-    id: 'm2',
-    role: MessageRole.user,
-    time: '10:05 AM',
-    content:
-        "Can you explain the right to a fair trial under the Constitution of Rwanda?",
-  ),
-  ChatMessage(
-    id: 'm3',
-    role: MessageRole.assistant,
-    time: '10:06 AM',
-    content:
-        "In simple terms, the Constitution ensures that every person has the right to be heard by a competent, independent, and impartial court. This means no one can be punished for an act that wasn't a crime when it happened, and everyone is presumed innocent until proven guilty.",
-    citation: Citation(
-      quote:
-          "Everyone has the right to be informed of the nature and cause of charges against them and the right to defense. No one shall be prosecuted, arrested, detained or punished except in cases provided for by the law in force at the time the offense was committed.",
-      source: 'Article 29, Constitution of Rwanda',
-      jurisdiction: 'Rwanda',
-      verifiedYear: 2024,
-      url: '#',
-    ),
-  ),
-];
-
 const List<QuickAction> assistantQuickActions = [
   QuickAction(id: 'qa1', label: 'Speak to a Lawyer', icon: LucideIcons.users),
-  QuickAction(id: 'qa2', label: 'View Court Process', icon: LucideIcons.landmark),
-  QuickAction(id: 'qa3', label: 'Draft Legal Notice', icon: LucideIcons.fileText),
+  QuickAction(
+      id: 'qa2', label: 'View Court Process', icon: LucideIcons.landmark),
+  QuickAction(
+      id: 'qa3', label: 'Draft Legal Notice', icon: LucideIcons.fileText),
 ];
 
 const int activeCaseCount = 12;
@@ -102,7 +64,12 @@ const List<OtherCase> otherCases = [
 ];
 
 const String researchJurisdiction = 'Rwanda';
-const List<String> jurisdictionOptions = ['Rwanda', 'South Africa', 'Kenya', 'Nigeria'];
+const List<String> jurisdictionOptions = [
+  'Rwanda',
+  'South Africa',
+  'Kenya',
+  'Nigeria'
+];
 const List<String> researchCategories = [
   'All Categories',
   'Labour Law',
