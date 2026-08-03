@@ -1,0 +1,27 @@
+# Web framework
+fastapi==0.136.1
+uvicorn[standard]==0.47.0
+
+# Validation / settings
+pydantic==2.13.4
+pydantic-settings==2.6.1
+python-dotenv==1.0.1
+
+# Auth + data store (Firebase project: lep-chat)
+firebase-admin==6.6.0
+google-cloud-firestore==2.19.0
+
+# RAG agent (Vertex AI Gemini + embeddings, same models used by ../gcs/ingest_v2.py)
+google-genai==1.75.0
+
+# Test client transport used by FastAPI's TestClient
+httpx==0.28.1
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==1.3.0
+pytest-mock==3.14.0
+
+# NOTE: install this into a project-local virtualenv (see README below), never into a
+# shared/base environment — google-genai in particular is a fast-moving package pinned
+# here to match versions already relied on by other tools in this environment.
