@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.core.config import get_settings
 from app.core.firebase import init_firebase_app
 from app.middleware.cors import setup_cors
-from app.routers import auth, education, messages, sessions, users
+from app.routers import auth, cases, conversations, education, messages, research, sessions, users
 
 settings = get_settings()
 
@@ -36,3 +36,6 @@ app.include_router(users.router, prefix=settings.api_v1_prefix)
 app.include_router(sessions.router, prefix=settings.api_v1_prefix)
 app.include_router(messages.router, prefix=settings.api_v1_prefix)
 app.include_router(education.router, prefix=settings.api_v1_prefix)
+app.include_router(research.router, prefix=settings.api_v1_prefix)
+app.include_router(cases.router, prefix=settings.api_v1_prefix)
+app.include_router(conversations.router, prefix=settings.api_v1_prefix)
