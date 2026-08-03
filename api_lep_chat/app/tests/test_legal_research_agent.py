@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
+from google.genai import types as genai_types
 
 from app.agents.config import AgentConfig
 from app.agents.legal_research_agent import LegalResearchAgent
@@ -50,24 +50,37 @@ def _make_firestore_client(chunks: list[dict], domain_summary: dict | None = Non
     return client
 
 
-def _make_genai_client(domain_guess_text: str, answer_text: str):
+def _tool_call_response(query: str) -> MagicMock:
+    """A generate_content response where the model decides to call the search tool."""
+    response = MagicMock()
+    part = genai_types.Part.from_function_call(name="search_legal_corpus", args={"query": query})
+    response.candidates = [MagicMock(content=genai_types.Content(role="model", parts=[part]))]
+    response.text = None
+    return response
+
+
+def _final_text_response(text: str) -> MagicMock:
+    """A generate_content response where the model is done calling tools and answers."""
+    response = MagicMock()
+    part = genai_types.Part(text=text)
+    response.candidates = [MagicMock(content=genai_types.Content(role="model", parts=[part]))]
+    response.text = text
+    return response
+
+
+def _make_genai_client(*generate_content_responses, embedding=(0.1, 0.2, 0.3)):
     genai_client = MagicMock()
     genai_client.aio = MagicMock()
-
-    generate_response = MagicMock()
-    generate_response.text = domain_guess_text
-    answer_response = MagicMock()
-    answer_response.text = answer_text
-    genai_client.aio.models.generate_content = AsyncMock(side_effect=[generate_response, answer_response])
+    genai_client.aio.models.generate_content = AsyncMock(side_effect=list(generate_content_responses))
 
     embed_response = MagicMock()
-    embed_response.embeddings = [MagicMock(values=[0.1, 0.2, 0.3])]
+    embed_response.embeddings = [MagicMock(values=list(embedding))]
     genai_client.aio.models.embed_content = AsyncMock(return_value=embed_response)
 
     return genai_client
 
 
-async def test_answer_returns_grounded_content_with_citations():
+async def test_answer_calls_the_search_tool_and_returns_grounded_content():
     chunks = [
         {
             "filename": "vat_law.pdf",
@@ -80,14 +93,14 @@ async def test_answer_returns_grounded_content_with_citations():
     ]
     firestore_client = _make_firestore_client(chunks)
     genai_client = _make_genai_client(
-        domain_guess_text='{"category": "Domestic laws", "domain": "Tax", "subdomain": "VAT"}',
-        answer_text="VAT is 18% [Source 1].",
+        _tool_call_response("VAT rate Rwanda"),
+        _final_text_response("VAT is 18% [Source: vat_law.pdf (Law No. 49 of 2023)]."),
     )
     agent = LegalResearchAgent(firestore_client, genai_client, _make_config())
 
     result = await agent.answer("What is the VAT rate in Rwanda?")
 
-    assert result.content == "VAT is 18% [Source 1]."
+    assert result.content == "VAT is 18% [Source: vat_law.pdf (Law No. 49 of 2023)]."
     assert result.citations == [
         {
             "source": "vat_law.pdf",
@@ -100,26 +113,45 @@ async def test_answer_returns_grounded_content_with_citations():
     ]
 
 
-async def test_answer_handles_domain_guess_wrapped_in_markdown_fence():
-    chunks = [{"filename": "labour_law.pdf", "domain": "Labour", "text": "..."}]
+async def test_answer_supports_multiple_tool_calls_for_a_multi_part_question():
+    chunks = [{"filename": "labour_law.pdf", "domain": "Labour", "text": "Working hours are 45 per week."}]
     firestore_client = _make_firestore_client(chunks)
     genai_client = _make_genai_client(
-        domain_guess_text='```json\n{"category": "Domestic laws", "domain": "Labour", "subdomain": null}\n```',
-        answer_text="Answer about labour law [Source 1].",
+        _tool_call_response("working hours"),
+        _tool_call_response("overtime pay"),
+        _final_text_response("Working hours are capped and overtime is paid [Source: labour_law.pdf]."),
     )
     agent = LegalResearchAgent(firestore_client, genai_client, _make_config())
 
-    result = await agent.answer("What are working hours?")
+    result = await agent.answer("What are working hours and overtime rules?")
 
-    assert "labour law" in result.content
+    assert "overtime" in result.content
+    assert genai_client.aio.models.generate_content.await_count == 3
 
 
 async def test_answer_returns_fallback_when_no_chunks_found():
     firestore_client = _make_firestore_client(chunks=[])
-    genai_client = _make_genai_client(domain_guess_text="{}", answer_text="unused")
+    genai_client = _make_genai_client(
+        _tool_call_response("something totally unrelated"),
+        _final_text_response("unused"),
+    )
     agent = LegalResearchAgent(firestore_client, genai_client, _make_config())
 
     result = await agent.answer("Something totally unrelated")
 
     assert "couldn't find any matching content" in result.content
     assert result.citations == []
+
+
+async def test_search_returns_raw_chunks_for_research_hub():
+    chunks = [{"filename": "land_law.pdf", "domain": "Land", "text": "Land titles must be registered."}]
+    firestore_client = _make_firestore_client(chunks)
+    genai_client = _make_genai_client()
+    genai_client.aio.models.generate_content = AsyncMock(
+        return_value=_final_text_response('{"category": "Domestic laws", "domain": "Land", "subdomain": null}')
+    )
+    agent = LegalResearchAgent(firestore_client, genai_client, _make_config())
+
+    results = await agent.search("land title registration")
+
+    assert results == chunks

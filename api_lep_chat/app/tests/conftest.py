@@ -84,6 +84,7 @@ class FakeMessageRepository:
 class FakeAgent:
     def __init__(self):
         self.calls: list[str] = []
+        self.search_calls: list[str] = []
 
     async def answer(self, question: str) -> AgentAnswer:
         self.calls.append(question)
@@ -101,6 +102,22 @@ class FakeAgent:
             ],
         )
 
+    async def search(self, query: str, limit: int = 10) -> list[dict]:
+        self.search_calls.append(query)
+        return [
+            {
+                "gcs_path": "Domestic laws/Laws in force/1. Fundamental/labour_law_n_49_of_2023.pdf",
+                "filename": "labour_law_n_49_of_2023.pdf",
+                "category": "Domestic laws",
+                "domain": "Labour Law",
+                "subdomain": "Employment",
+                "law_number": "49",
+                "law_year": "2023",
+                "law_title": None,
+                "text": "Article 24: Every employer shall provide written notice before terminating an employment contract.",
+            }
+        ]
+
 
 class FakeUserRepository:
     def __init__(self):
@@ -117,6 +134,54 @@ class FakeUserRepository:
     async def get(self, uid: str) -> dict | None:
         doc = self._store.get(uid)
         return dict(doc) if doc else None
+
+    async def search_by_username_prefix(self, prefix: str, limit: int = 20) -> list[dict]:
+        return [dict(d) for d in self._store.values() if d.get("username", "").startswith(prefix)][:limit]
+
+
+class FakeConversationRepository:
+    def __init__(self):
+        self._conversations: dict[str, dict] = {}
+        self._messages: dict[str, dict[str, dict]] = {}
+        self._counter = 0
+
+    async def find_between(self, uid_a: str, uid_b: str) -> dict | None:
+        pair = sorted([uid_a, uid_b])
+        for doc in self._conversations.values():
+            if doc["participant_uids"] == pair:
+                return dict(doc)
+        return None
+
+    async def create(self, uid_a: str, uid_b: str) -> dict:
+        self._counter += 1
+        conversation_id = f"conversation-{self._counter}"
+        doc = {
+            "id": conversation_id,
+            "participant_uids": sorted([uid_a, uid_b]),
+            "last_message": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+        self._conversations[conversation_id] = doc
+        self._messages[conversation_id] = {}
+        return dict(doc)
+
+    async def get(self, conversation_id: str) -> dict | None:
+        doc = self._conversations.get(conversation_id)
+        return dict(doc) if doc else None
+
+    async def list_for_user(self, uid: str) -> list[dict]:
+        return [dict(d) for d in self._conversations.values() if uid in d["participant_uids"]]
+
+    async def add_message(self, conversation_id: str, sender_id: str, content: str) -> dict:
+        message_id = f"message-{len(self._messages[conversation_id]) + 1}"
+        doc = {"id": message_id, "conversation_id": conversation_id, "sender_id": sender_id, "content": content, "created_at": None}
+        self._messages[conversation_id][message_id] = doc
+        self._conversations[conversation_id]["last_message"] = content
+        return dict(doc)
+
+    async def list_messages(self, conversation_id: str) -> list[dict]:
+        return [dict(d) for d in self._messages.get(conversation_id, {}).values()]
 
 
 class FakeCourseRepository:
@@ -146,6 +211,53 @@ class FakeCourseAgent:
                 for i in range(1, 6)
             ],
         )
+
+
+class FakeCaseRepository:
+    def __init__(self):
+        self._store: dict[str, dict] = {}
+        self._counter = 0
+
+    async def create(self, user_id: str, **fields) -> dict:
+        self._counter += 1
+        case_id = f"case-{self._counter}"
+        doc = {
+            **fields,
+            "id": case_id,
+            "user_id": user_id,
+            "ref": f"LEP-TEST{self._counter}",
+            "status": "submitted",
+            "evidence": [],
+            "created_at": None,
+            "updated_at": None,
+        }
+        self._store[case_id] = doc
+        return dict(doc)
+
+    async def get(self, case_id: str) -> dict | None:
+        doc = self._store.get(case_id)
+        return dict(doc) if doc else None
+
+    async def list_by_user(self, user_id: str) -> list[dict]:
+        return [dict(d) for d in self._store.values() if d["user_id"] == user_id]
+
+    async def add_evidence(self, case_id: str, evidence_item: dict) -> dict | None:
+        doc = self._store.get(case_id)
+        if doc is None:
+            return None
+        doc["evidence"] = [*doc["evidence"], evidence_item]
+        return dict(doc)
+
+    async def update_status(self, case_id: str, status: str) -> dict | None:
+        doc = self._store.get(case_id)
+        if doc is None:
+            return None
+        doc["status"] = status
+        return dict(doc)
+
+
+async def _fake_upload_bytes(bucket: str, folder: str, filename: str, content: bytes, content_type: str | None) -> str:
+    return f"{folder}/fake-uuid_{filename}"
 
 
 @pytest.fixture
