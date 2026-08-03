@@ -24,6 +24,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nationalId = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   String _jurisdiction = jurisdictionOptions.first;
 
   @override
@@ -34,6 +35,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _nationalId.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -135,13 +137,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
                 ),
                 const SizedBox(height: 14),
-                LepFormField(
+                LepPasswordField(
                   label: 'Password',
                   controller: _password,
                   hint: '••••••••••••',
-                  obscureText: true,
                   validator: (v) =>
                       (v == null || v.length < 8) ? 'Use at least 8 characters' : null,
+                ),
+                const SizedBox(height: 14),
+                LepPasswordField(
+                  label: 'Confirm password',
+                  controller: _confirmPassword,
+                  hint: '••••••••••••',
+                  validator: (v) =>
+                      (v != _password.text) ? 'Passwords do not match' : null,
                 ),
                 const SizedBox(height: 24),
                 LepPrimaryButton(
