@@ -112,6 +112,156 @@ class UserProfile {
       );
 }
 
+class PublicUser {
+  final String uid;
+  final String fullName;
+  final String username;
+
+  const PublicUser({required this.uid, required this.fullName, required this.username});
+
+  factory PublicUser.fromJson(Map<String, dynamic> json) => PublicUser(
+        uid: json['uid'] as String,
+        fullName: json['full_name'] as String,
+        username: json['username'] as String,
+      );
+}
+
+class ApiConversation {
+  final String id;
+  final List<String> participantUids;
+  final PublicUser? otherParticipant;
+  final String? lastMessage;
+  final DateTime? updatedAt;
+
+  const ApiConversation({
+    required this.id,
+    required this.participantUids,
+    this.otherParticipant,
+    this.lastMessage,
+    this.updatedAt,
+  });
+
+  factory ApiConversation.fromJson(Map<String, dynamic> json) => ApiConversation(
+        id: json['id'] as String,
+        participantUids: (json['participant_uids'] as List<dynamic>).cast<String>(),
+        otherParticipant:
+            json['other_participant'] != null ? PublicUser.fromJson(json['other_participant'] as Map<String, dynamic>) : null,
+        lastMessage: json['last_message'] as String?,
+        updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'] as String) : null,
+      );
+}
+
+class ApiDirectMessage {
+  final String id;
+  final String conversationId;
+  final String senderId;
+  final String content;
+  final DateTime? createdAt;
+
+  const ApiDirectMessage({
+    required this.id,
+    required this.conversationId,
+    required this.senderId,
+    required this.content,
+    this.createdAt,
+  });
+
+  factory ApiDirectMessage.fromJson(Map<String, dynamic> json) => ApiDirectMessage(
+        id: json['id'] as String,
+        conversationId: json['conversation_id'] as String,
+        senderId: json['sender_id'] as String,
+        content: json['content'] as String,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+      );
+}
+
+class ApiEvidence {
+  final String filename;
+  final String gcsPath;
+  final String? contentType;
+
+  const ApiEvidence({required this.filename, required this.gcsPath, this.contentType});
+
+  factory ApiEvidence.fromJson(Map<String, dynamic> json) => ApiEvidence(
+        filename: json['filename'] as String,
+        gcsPath: json['gcs_path'] as String,
+        contentType: json['content_type'] as String?,
+      );
+}
+
+class ApiCase {
+  final String id;
+  final String ref;
+  final String caseType; // 'case' | 'violation_report'
+  final String title;
+  final String category;
+  final String description;
+  final String? location;
+  final String status;
+  final List<ApiEvidence> evidence;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const ApiCase({
+    required this.id,
+    required this.ref,
+    required this.caseType,
+    required this.title,
+    required this.category,
+    required this.description,
+    this.location,
+    required this.status,
+    this.evidence = const [],
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  bool get isViolationReport => caseType == 'violation_report';
+
+  factory ApiCase.fromJson(Map<String, dynamic> json) => ApiCase(
+        id: json['id'] as String,
+        ref: json['ref'] as String,
+        caseType: json['case_type'] as String,
+        title: json['title'] as String,
+        category: json['category'] as String,
+        description: json['description'] as String? ?? '',
+        location: json['location'] as String?,
+        status: json['status'] as String,
+        evidence: (json['evidence'] as List<dynamic>? ?? [])
+            .map((e) => ApiEvidence.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'] as String) : null,
+        updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'] as String) : null,
+      );
+}
+
+class ApiResearchResult {
+  final String id;
+  final String institution;
+  final String tag;
+  final String title;
+  final String summary;
+  final String? gcsPath;
+
+  const ApiResearchResult({
+    required this.id,
+    required this.institution,
+    required this.tag,
+    required this.title,
+    required this.summary,
+    this.gcsPath,
+  });
+
+  factory ApiResearchResult.fromJson(Map<String, dynamic> json) => ApiResearchResult(
+        id: json['id'] as String,
+        institution: json['institution'] as String,
+        tag: json['tag'] as String,
+        title: json['title'] as String,
+        summary: json['summary'] as String,
+        gcsPath: json['gcs_path'] as String?,
+      );
+}
+
 class EducationTrack {
   final String slug;
   final String label;
