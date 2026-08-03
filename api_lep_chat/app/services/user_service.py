@@ -23,6 +23,10 @@ class UserProfileService:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Profile not found")
         return profile
 
+    async def search_users(self, user: CurrentUser, query: str) -> list[dict]:
+        results = await self._users.search_by_username_prefix(query.lower())
+        return [r for r in results if r["uid"] != user.uid]
+
 
 def get_user_profile_service(settings: Settings = Depends(get_settings)) -> UserProfileService:
     client = get_firestore_client()

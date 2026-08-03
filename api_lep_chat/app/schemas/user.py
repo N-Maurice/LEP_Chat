@@ -32,6 +32,15 @@ class UserProfileUpdate(BaseModel):
     national_id: str | None = None
 
 
+class PublicUserOut(BaseModel):
+    """Minimal public profile shown to other citizens when starting a direct message —
+    deliberately excludes phone_number/national_id/jurisdiction."""
+
+    uid: str
+    full_name: str
+    username: str
+
+
 class UserProfileOut(BaseModel):
     uid: str
     email: str | None = None
