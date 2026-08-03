@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.10.0'
 
 dependencies:
+  file_picker: ^11.0.3
   firebase_auth: ^6.5.6
   firebase_core: ^4.12.1
   flutter:
@@ -17,8 +18,10 @@ dependencies:
   # Icon set matching the web prototype 1:1 (Scale, ShieldCheck, BookOpen, etc.)
   google_sign_in: ^7.2.0
   http: ^1.6.0
+  http_parser: ^4.1.2
   lucide_icons_flutter: ^3.0.11
   provider: ^6.1.5+1
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
