@@ -159,6 +159,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   loading: auth.isBusy,
                   onPressed: () => _submit(auth),
                 ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: AppColors.line)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text('or', style: AppText.body(size: 11.5, color: AppColors.slate)),
+                    ),
+                    const Expanded(child: Divider(color: AppColors.line)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                LepSecondaryButton(
+                  label: 'Sign up with Google',
+                  icon: LucideIcons.globe,
+                  onPressed: auth.isBusy ? null : () => auth.signInWithGoogle(),
+                ),
                 const SizedBox(height: 12),
                 Center(
                   child: GestureDetector(

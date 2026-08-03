@@ -12,7 +12,20 @@
           "package_name": "com.example.leap_chat"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "683434123196-f4d8kks7at5lcbbqhh4nq8t0ucrn7odp.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.leap_chat",
+            "certificate_hash": "f0566919de1eef96b1804fb5aa614ccee2eb46cf"
+          }
+        },
+        {
+          "client_id": "683434123196-mc9u3h67ujivl8ogplf9i5mg94ldhcq4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBLTKR4UyWXgZbJrLQycW3TSwck9L-yM4U"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "683434123196-mc9u3h67ujivl8ogplf9i5mg94ldhcq4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "683434123196-k95pntf4a96g84bfoo3p9fjf4orsblef.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.leapChat"
+              }
+            }
+          ]
         }
       }
     }

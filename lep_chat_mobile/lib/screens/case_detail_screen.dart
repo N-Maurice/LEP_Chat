@@ -47,7 +47,7 @@ class _CaseDetailScreenState extends State<CaseDetailScreen> {
   bool _uploading = false;
 
   Future<void> _addEvidence() async {
-    final result = await FilePicker.pickFiles(allowMultiple: true, withData: true);
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
     if (result == null || result.files.isEmpty) return;
     setState(() => _uploading = true);
     try {

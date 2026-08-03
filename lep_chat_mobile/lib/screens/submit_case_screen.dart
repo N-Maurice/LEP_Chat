@@ -47,7 +47,7 @@ class _SubmitCaseScreenState extends State<SubmitCaseScreen> {
   }
 
   Future<void> _pickEvidence() async {
-    final result = await FilePicker.pickFiles(allowMultiple: true, withData: true);
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
     if (result == null) return;
     setState(() => _evidence.addAll(result.files));
   }
