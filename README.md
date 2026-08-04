@@ -173,3 +173,4 @@ The backend is deployed on [Render](https://render.com) at `https://lep-chat.onr
 - Grace Umwari
 
 Repository: [github.com/N-Maurice/LEP_Chat](https://github.com/N-Maurice/LEP_Chat)
+Demo video: https://youtu.be/oAn5mUAuBaI
