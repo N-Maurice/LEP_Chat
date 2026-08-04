@@ -22,3 +22,14 @@ class UserRepository:
         if not snapshot.exists:
             return None
         return {"uid": snapshot.id, **snapshot.to_dict()}
+
+    async def search_by_username_prefix(self, prefix: str, limit: int = 20) -> list[dict]:
+        """Prefix search on `username` — Firestore has no full-text search, so this
+        is a `[prefix, prefix + \\uf8ff)` range query, the standard workaround."""
+        query = (
+            self._collection.where("username", ">=", prefix)
+            .where("username", "<", prefix + "")
+            .limit(limit)
+        )
+        docs = await query.get()
+        return [{"uid": d.id, **d.to_dict()} for d in docs]

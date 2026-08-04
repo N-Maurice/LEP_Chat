@@ -24,6 +24,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _nationalId = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
   String _jurisdiction = jurisdictionOptions.first;
 
   @override
@@ -34,6 +35,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _nationalId.dispose();
     _email.dispose();
     _password.dispose();
+    _confirmPassword.dispose();
     super.dispose();
   }
 
@@ -135,13 +137,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
                 ),
                 const SizedBox(height: 14),
-                LepFormField(
+                LepPasswordField(
                   label: 'Password',
                   controller: _password,
                   hint: '••••••••••••',
-                  obscureText: true,
                   validator: (v) =>
                       (v == null || v.length < 8) ? 'Use at least 8 characters' : null,
+                ),
+                const SizedBox(height: 14),
+                LepPasswordField(
+                  label: 'Confirm password',
+                  controller: _confirmPassword,
+                  hint: '••••••••••••',
+                  validator: (v) =>
+                      (v != _password.text) ? 'Passwords do not match' : null,
                 ),
                 const SizedBox(height: 24),
                 LepPrimaryButton(
@@ -149,6 +158,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   icon: LucideIcons.arrowRight,
                   loading: auth.isBusy,
                   onPressed: () => _submit(auth),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Expanded(child: Divider(color: AppColors.line)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: Text('or', style: AppText.body(size: 11.5, color: AppColors.slate)),
+                    ),
+                    const Expanded(child: Divider(color: AppColors.line)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                LepSecondaryButton(
+                  label: 'Sign up with Google',
+                  icon: LucideIcons.globe,
+                  onPressed: auth.isBusy ? null : () => auth.signInWithGoogle(),
                 ),
                 const SizedBox(height: 12),
                 Center(

@@ -1,6 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../core/api_client.dart';
+import '../services/case_api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 
@@ -19,28 +22,38 @@ const _categories = [
   _ViolationCategory('Other', LucideIcons.ellipsis),
 ];
 
-/// Screen — Report a Violation. A 3-step wizard (Incident / Location /
-/// Evidence). No backend endpoint exists for this yet, so submission is
-/// local-only: it confirms and resets rather than persisting anywhere.
+/// Screen — Report a Violation. A 3-step wizard (Incident / Location / Evidence)
+/// that submits to the same /cases backend as Case Tracking, tagged
+/// case_type=violation_report, so a filed report shows up in "Track a Case" too.
 class ReportViolationScreen extends StatefulWidget {
-  const ReportViolationScreen({super.key});
+  final CaseApiService? caseApi;
+  const ReportViolationScreen({super.key, this.caseApi});
 
   @override
   State<ReportViolationScreen> createState() => _ReportViolationScreenState();
 }
 
 class _ReportViolationScreenState extends State<ReportViolationScreen> {
+  late final CaseApiService _caseApi = widget.caseApi ?? CaseApiService(ApiClient());
+
   int _step = 0;
   String? _category;
   final _description = TextEditingController();
   final _location = TextEditingController();
-  final List<String> _evidence = [];
+  final List<PlatformFile> _evidence = [];
+  bool _submitting = false;
 
   @override
   void dispose() {
     _description.dispose();
     _location.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickEvidence() async {
+    final result = await FilePicker.platform.pickFiles(allowMultiple: true, withData: true);
+    if (result == null) return;
+    setState(() => _evidence.addAll(result.files));
   }
 
   void _next() {
@@ -57,7 +70,33 @@ class _ReportViolationScreenState extends State<ReportViolationScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    try {
+      final created = await _caseApi.createCase(
+        caseType: 'violation_report',
+        title: '$_category violation report',
+        category: _category!,
+        description: _description.text.trim(),
+        location: _location.text.trim().isEmpty ? null : _location.text.trim(),
+      );
+      for (final file in _evidence) {
+        if (file.bytes == null) continue;
+        await _caseApi.uploadEvidence(created.id, bytes: file.bytes!, filename: file.name);
+      }
+      if (!mounted) return;
+      _showSuccess();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e is ApiException ? e.message : 'Could not submit this report. Please try again.')),
+      );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _showSuccess() {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -65,8 +104,8 @@ class _ReportViolationScreenState extends State<ReportViolationScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text('Report submitted', style: AppText.display(size: 17, weight: FontWeight.w700)),
         content: Text(
-          'Your report has been recorded confidentially. Investigators may follow up '
-          'through the app if more information is needed.',
+          'Your report has been recorded and added to your tracked cases. You can follow its '
+          'status from the Cases tab.',
           style: AppText.body(size: 12.5, color: AppColors.inkSoft),
         ),
         actions: [
@@ -133,11 +172,12 @@ class _ReportViolationScreenState extends State<ReportViolationScreen> {
                 children: [
                   if (_step == 0) _IncidentStep(category: _category, onCategory: (c) => setState(() => _category = c), description: _description),
                   if (_step == 1) _LocationStep(controller: _location),
-                  if (_step == 2) _EvidenceStep(evidence: _evidence, onAdd: () => setState(() => _evidence.add('evidence_${_evidence.length + 1}.jpg'))),
+                  if (_step == 2) _EvidenceStep(evidence: _evidence, onAdd: _pickEvidence),
                   const SizedBox(height: 20),
                   LepPrimaryButton(
                     label: _step < 2 ? 'Continue' : 'Submit Report',
                     icon: _step < 2 ? LucideIcons.arrowRight : LucideIcons.circleCheck,
+                    loading: _submitting,
                     onPressed: _next,
                   ),
                 ],
@@ -280,7 +320,7 @@ class _LocationStep extends StatelessWidget {
 }
 
 class _EvidenceStep extends StatelessWidget {
-  final List<String> evidence;
+  final List<PlatformFile> evidence;
   final VoidCallback onAdd;
   const _EvidenceStep({required this.evidence, required this.onAdd});
 
@@ -308,21 +348,25 @@ class _EvidenceStep extends StatelessWidget {
               children: [
                 const Icon(LucideIcons.upload, size: 24, color: AppColors.oxblood),
                 const SizedBox(height: 8),
-                Text('Tap to attach a file', style: AppText.body(size: 12.5, weight: FontWeight.w600)),
+                Text('Tap to attach files', style: AppText.body(size: 12.5, weight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text('Any format — photos, PDFs, audio, video', style: AppText.body(size: 11, color: AppColors.slate)),
               ],
             ),
           ),
         ),
         if (evidence.isNotEmpty) ...[
           const SizedBox(height: 14),
-          for (final e in evidence)
+          for (final file in evidence)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
                   const Icon(LucideIcons.paperclip, size: 14, color: AppColors.slate),
                   const SizedBox(width: 8),
-                  Text(e, style: AppText.mono(size: 11.5, color: AppColors.inkSoft)),
+                  Expanded(
+                    child: Text(file.name, style: AppText.mono(size: 11.5, color: AppColors.inkSoft), overflow: TextOverflow.ellipsis),
+                  ),
                 ],
               ),
             ),

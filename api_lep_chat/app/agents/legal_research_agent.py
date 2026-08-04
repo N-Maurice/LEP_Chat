@@ -1,13 +1,11 @@
-"""The chatbot's "agent": an async port of gcs/query_cli.py's RAG flow (domain-catalog
-lookup -> Firestore vector search -> Gemini grounded answer with citations), reused here
-instead of duplicated so both the CLI and the API stay backed by the same retrieval logic.
+"""The chatbot's "agent". Two retrieval strategies live here, both backed by the same
+Firestore vector search over document_chunks (populated by gcs/ingest_v2.py):
 
-Flow per question:
-  1. Load the domain summary (the "table of contents" built by build_catalog.py).
-  2. Ask Gemini to guess which domain/subdomain is most relevant.
-  3. Embed the question and run a vector search over document_chunks.
-  4. Soft-boost chunks whose domain matches the guessed domain.
-  5. Send the top chunks + question to Gemini, ask for a grounded answer with citations.
+  - `search()` — a single raw semantic search, used by the Research Hub's search box.
+  - `answer()` — an agentic tool-calling loop: Gemini is given a `search_legal_corpus`
+    tool and decides for itself when and what to search (possibly multiple times for a
+    multi-part question) before writing a grounded, cited answer. This replaces a fixed
+    "one search, one generation" pipeline with one the model can extend on its own.
 """
 
 import json
@@ -15,15 +13,44 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 from google import genai
+from google.genai import types as genai_types
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_vector_query import DistanceMeasure
 from google.cloud.firestore_v1.vector import Vector
 
 from app.agents.config import AgentConfig
-from app.agents.prompts import DOMAIN_GUESS_PROMPT, GROUNDED_ANSWER_PROMPT
+from app.agents.prompts import AGENT_SYSTEM_INSTRUCTION, DOMAIN_GUESS_PROMPT
 from app.agents.utils import excerpt, parse_json_response
 from app.core.config import get_settings
 from app.db.firestore_client import get_firestore_client
+
+MAX_TOOL_CALL_ROUNDS = 4
+
+_SEARCH_TOOL = genai_types.Tool(
+    function_declarations=[
+        genai_types.FunctionDeclaration(
+            name="search_legal_corpus",
+            description=(
+                "Searches the ingested Rwandan legal corpus (constitution, laws, regulations) "
+                "for passages relevant to a specific legal question or topic."
+            ),
+            parameters=genai_types.Schema(
+                type="OBJECT",
+                properties={
+                    "query": genai_types.Schema(
+                        type="STRING",
+                        description=(
+                            "A focused legal search phrase, e.g. 'employer termination notice "
+                            "period' or 'land title dispute registration process' — not the "
+                            "user's whole message verbatim."
+                        ),
+                    )
+                },
+                required=["query"],
+            ),
+        )
+    ]
+)
 
 
 @dataclass
@@ -38,22 +65,84 @@ class LegalResearchAgent:
         self._genai = genai_client
         self._config = config
 
-    async def answer(self, question: str) -> AgentAnswer:
+    async def search(self, query: str, limit: int = 10) -> list[dict]:
+        """Raw semantic search over document_chunks for the Research Hub — no
+        Gemini grounded-answer generation, just the ranked source chunks
+        themselves (each result IS a citation, ready for `Read Original`)."""
         domain_summary = await self._load_domain_summary()
-        guess = await self._guess_relevant_domain(question, domain_summary) if domain_summary else {}
+        guess = await self._guess_relevant_domain(query, domain_summary) if domain_summary else {}
 
-        query_vector = await self._embed_question(question)
-        chunks = await self._vector_search_chunks(query_vector, guess.get("domain"))
+        query_vector = await self._embed_question(query)
+        chunks = await self._vector_search_chunks(query_vector, guess.get("domain"), limit=limit)
+        return chunks
 
-        if not chunks:
+    async def answer(self, question: str) -> AgentAnswer:
+        collected_chunks: dict[str, dict] = {}
+        contents: list[genai_types.Content] = [
+            genai_types.Content(role="user", parts=[genai_types.Part(text=question)])
+        ]
+        config = genai_types.GenerateContentConfig(
+            system_instruction=AGENT_SYSTEM_INSTRUCTION,
+            tools=[_SEARCH_TOOL],
+        )
+
+        final_text = ""
+        for _ in range(MAX_TOOL_CALL_ROUNDS):
+            response = await self._genai.aio.models.generate_content(
+                model=self._config.generation_model,
+                contents=contents,
+                config=config,
+            )
+            candidate_content = response.candidates[0].content
+            contents.append(candidate_content)
+
+            function_calls = [part.function_call for part in (candidate_content.parts or []) if part.function_call]
+            if not function_calls:
+                final_text = response.text or ""
+                break
+
+            response_parts = []
+            for call in function_calls:
+                query = (call.args or {}).get("query") or question
+                chunks = await self._search_chunks(query)
+                for chunk in chunks:
+                    key = chunk.get("gcs_path") or chunk.get("filename", "")
+                    collected_chunks.setdefault(key, chunk)
+                response_parts.append(
+                    genai_types.Part.from_function_response(
+                        name=call.name,
+                        response={"result": self._format_search_results(chunks)},
+                    )
+                )
+            contents.append(genai_types.Content(role="user", parts=response_parts))
+        else:
+            final_text = response.text or ""
+
+        if not collected_chunks:
             return AgentAnswer(
                 content="I couldn't find any matching content in the ingested legal documents "
                 "for this question. Try rephrasing it or asking about a different topic.",
                 citations=[],
             )
 
-        content = await self._build_grounded_answer(question, chunks)
-        return AgentAnswer(content=content, citations=self._citations_from_chunks(chunks))
+        return AgentAnswer(content=final_text, citations=self._citations_from_chunks(list(collected_chunks.values())))
+
+    async def _search_chunks(self, query: str) -> list[dict]:
+        query_vector = await self._embed_question(query)
+        return await self._vector_search_chunks(query_vector, None, limit=self._config.top_k_chunks)
+
+    def _format_search_results(self, chunks: list[dict]) -> str:
+        if not chunks:
+            return "No matching passages found for this query."
+        blocks = [f"[Source: {self._source_label(c)}]\n{c.get('text', '')}" for c in chunks]
+        return "\n\n---\n\n".join(blocks)
+
+    @classmethod
+    def _source_label(cls, chunk: dict) -> str:
+        ref = chunk.get("law_title") or chunk.get("filename", "unknown source")
+        if chunk.get("law_number") and chunk.get("law_year"):
+            ref += f" (Law No. {chunk['law_number']} of {chunk['law_year']})"
+        return ref
 
     async def _load_domain_summary(self) -> dict:
         doc = await self._firestore.collection("catalog_meta").document("domain_summary").get()
@@ -79,36 +168,23 @@ class LegalResearchAgent:
         )
         return response.embeddings[0].values
 
-    async def _vector_search_chunks(self, query_vector: list[float], guessed_domain: str | None) -> list[dict]:
+    async def _vector_search_chunks(
+        self, query_vector: list[float], guessed_domain: str | None, limit: int | None = None
+    ) -> list[dict]:
+        top_k = limit or self._config.top_k_chunks
         collection = self._firestore.collection(self._config.chunks_collection)
         results = await collection.find_nearest(
             vector_field="embedding",
             query_vector=Vector(query_vector),
             distance_measure=DistanceMeasure.COSINE,
-            limit=self._config.top_k_chunks * 2,
+            limit=top_k * 2,
         ).get()
 
         chunks = [doc.to_dict() for doc in results]
         if guessed_domain:
             chunks.sort(key=lambda c: 0 if c.get("domain") == guessed_domain else 1)
 
-        return chunks[: self._config.top_k_chunks]
-
-    async def _build_grounded_answer(self, question: str, chunks: list[dict]) -> str:
-        context_blocks = []
-        for i, c in enumerate(chunks):
-            law_ref = c.get("filename", "unknown file")
-            if c.get("law_number") and c.get("law_year"):
-                law_ref += f" (Law No. {c['law_number']} of {c['law_year']})"
-            context_blocks.append(f"[Source {i + 1}: {law_ref}]\n{c.get('text', '')}")
-        context = "\n\n---\n\n".join(context_blocks)
-
-        prompt = GROUNDED_ANSWER_PROMPT.format(context=context, question=question)
-        response = await self._genai.aio.models.generate_content(
-            model=self._config.generation_model,
-            contents=prompt,
-        )
-        return response.text or ""
+        return chunks[:top_k]
 
     @classmethod
     def _citations_from_chunks(cls, chunks: list[dict]) -> list[dict]:

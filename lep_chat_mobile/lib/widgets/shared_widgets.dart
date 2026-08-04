@@ -319,6 +319,49 @@ class LepFormField extends StatelessWidget {
   }
 }
 
+/// Password input built on [LepFormField] with a show/hide toggle (eye icon),
+/// matching the mockup's obscured-password field with visibility control.
+class LepPasswordField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final String? Function(String?)? validator;
+
+  const LepPasswordField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.validator,
+  });
+
+  @override
+  State<LepPasswordField> createState() => _LepPasswordFieldState();
+}
+
+class _LepPasswordFieldState extends State<LepPasswordField> {
+  bool _obscure = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return LepFormField(
+      label: widget.label,
+      controller: widget.controller,
+      hint: widget.hint,
+      obscureText: _obscure,
+      validator: widget.validator,
+      suffixIcon: IconButton(
+        icon: Icon(
+          _obscure ? LucideIcons.eye : LucideIcons.eyeOff,
+          size: 18,
+          color: AppColors.slate,
+        ),
+        onPressed: () => setState(() => _obscure = !_obscure),
+      ),
+    );
+  }
+}
+
 /// Full-width primary button in oxblood, used for the main CTA on every
 /// auth screen (Get Started, Sign In, Verify Identity...).
 class LepPrimaryButton extends StatelessWidget {

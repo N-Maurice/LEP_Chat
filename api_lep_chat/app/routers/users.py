@@ -1,10 +1,20 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 
-from app.schemas.user import CurrentUser, UserProfileOut, UserProfileUpdate, UserProfileUpsert
+from app.schemas.user import CurrentUser, PublicUserOut, UserProfileOut, UserProfileUpdate, UserProfileUpsert
 from app.services.auth_service import get_current_user
 from app.services.user_service import UserProfileService, get_user_profile_service
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/search", response_model=list[PublicUserOut])
+async def search_users(
+    q: str = Query(min_length=1),
+    user: CurrentUser = Depends(get_current_user),
+    service: UserProfileService = Depends(get_user_profile_service),
+) -> list[dict]:
+    """Finds citizens by username prefix so a conversation can be started with them."""
+    return await service.search_users(user, q)
 
 
 @router.post("/me", response_model=UserProfileOut, status_code=status.HTTP_201_CREATED)

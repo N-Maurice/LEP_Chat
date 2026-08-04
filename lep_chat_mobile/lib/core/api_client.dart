@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import 'env.dart';
 
@@ -88,5 +89,31 @@ class ApiClient {
   Future<void> delete(String path) async {
     final response = await _http.delete(_uri(path), headers: await _headers());
     _decode(response);
+  }
+
+  /// Multipart upload for evidence files (Cases / Report a Violation). [bytes] is the
+  /// raw file content and [filename] is sent as-is — the backend infers content type
+  /// from [contentType] if the caller has it, otherwise lets the server guess.
+  Future<dynamic> postMultipart(
+    String path, {
+    required String fieldName,
+    required List<int> bytes,
+    required String filename,
+    String? contentType,
+  }) async {
+    final request = http.MultipartRequest('POST', _uri(path));
+    final token = await _getIdToken();
+    if (token != null) {
+      request.headers['Authorization'] = 'Bearer $token';
+    }
+    request.files.add(http.MultipartFile.fromBytes(
+      fieldName,
+      bytes,
+      filename: filename,
+      contentType: contentType != null ? MediaType.parse(contentType) : null,
+    ));
+    final streamed = await _http.send(request);
+    final response = await http.Response.fromStream(streamed);
+    return _decode(response);
   }
 }

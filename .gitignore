@@ -62,3 +62,4 @@ api_lep_chat/app/*.json
 firebase-debug.log
 .firebase/
 push.sh
+docs/

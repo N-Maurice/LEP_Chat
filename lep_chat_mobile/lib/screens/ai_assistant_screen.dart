@@ -2,16 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../core/api_client.dart';
-import '../data/mock_data.dart';
 import '../models/api_models.dart';
-import '../models/models.dart';
 import '../services/chat_api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/shared_widgets.dart';
 
-/// Screen 1 — AI Legal Assistant, wired to the real backend: it loads (or
-/// creates) the user's most recent chat session, then every send/receive
-/// goes through ChatApiService -> api_lep_chat/app/routers/messages.py.
+const _starterPrompts = [
+  'What are my rights if I’m dismissed from my job?',
+  'How do I register a land title dispute?',
+  'Explain the process for filing a small claims case.',
+];
+
+/// Talk with Assistant — the AI Legal Assistant, wired to the real backend with
+/// full CRUD: sessions can be created, listed, renamed, and deleted (history
+/// sheet), and messages can be sent, edited, and deleted (long-press a message
+/// you sent). Every reply is grounded in the ingested Firestore chunks via
+/// api_lep_chat/app/agents/legal_research_agent.py.
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
 
@@ -44,6 +50,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   Future<void> _bootstrap() async {
+    setState(() => _loadingHistory = true);
     try {
       final sessions = await _chatApi.listSessions();
       final session = sessions.isEmpty
@@ -64,6 +71,112 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
         _loadingHistory = false;
       });
     }
+  }
+
+  Future<void> _startNewChat() async {
+    setState(() {
+      _loadingHistory = true;
+      _error = null;
+    });
+    try {
+      final session = await _chatApi.createSession(title: 'Legal Assistant');
+      if (!mounted) return;
+      setState(() {
+        _sessionId = session.id;
+        _messages = [];
+        _loadingHistory = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyError(e);
+        _loadingHistory = false;
+      });
+    }
+  }
+
+  Future<void> _switchSession(String sessionId) async {
+    Navigator.of(context).pop();
+    setState(() {
+      _loadingHistory = true;
+      _error = null;
+    });
+    try {
+      final messages = await _chatApi.listMessages(sessionId);
+      if (!mounted) return;
+      setState(() {
+        _sessionId = sessionId;
+        _messages = messages;
+        _loadingHistory = false;
+      });
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyError(e);
+        _loadingHistory = false;
+      });
+    }
+  }
+
+  Future<void> _openHistory() async {
+    List<ApiSession> sessions;
+    try {
+      sessions = await _chatApi.listSessions();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.paper,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => _HistorySheet(
+        sessions: sessions,
+        activeSessionId: _sessionId,
+        onSelect: _switchSession,
+        onRename: (session) async {
+          final newTitle = await _promptForText(sheetContext, title: 'Rename chat', initial: session.title);
+          if (newTitle == null || newTitle.trim().isEmpty) return;
+          await _chatApi.renameSession(session.id, newTitle.trim());
+          if (!sheetContext.mounted) return;
+          Navigator.of(sheetContext).pop();
+          _openHistory();
+        },
+        onDelete: (session) async {
+          await _chatApi.deleteSession(session.id);
+          if (!sheetContext.mounted) return;
+          Navigator.of(sheetContext).pop();
+          if (session.id == _sessionId) {
+            _bootstrap();
+          } else {
+            _openHistory();
+          }
+        },
+      ),
+    );
+  }
+
+  Future<String?> _promptForText(BuildContext context, {required String title, String? initial}) {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.paper,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title, style: AppText.display(size: 16, weight: FontWeight.w700)),
+        content: TextField(controller: controller, autofocus: true, style: AppText.body(size: 13.5)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text('Save', style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.oxblood)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _send([String? presetText]) async {
@@ -90,6 +203,57 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
     }
   }
 
+  Future<void> _onMessageLongPress(ApiMessage message) async {
+    if (!message.isUser || _sessionId == null) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.paper,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.pencil, size: 18, color: AppColors.ink),
+              title: const Text('Edit message'),
+              onTap: () => Navigator.of(sheetContext).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.trash2, size: 18, color: Colors.redAccent),
+              title: const Text('Delete message'),
+              onTap: () => Navigator.of(sheetContext).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+
+    if (action == 'edit') {
+      final newContent = await _promptForText(context, title: 'Edit message', initial: message.content);
+      if (newContent == null || newContent.trim().isEmpty) return;
+      try {
+        final updated = await _chatApi.updateMessage(_sessionId!, message.id, newContent.trim());
+        if (!mounted) return;
+        setState(() {
+          _messages = [for (final m in _messages) if (m.id == message.id) updated else m];
+        });
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
+      }
+    } else if (action == 'delete') {
+      try {
+        await _chatApi.deleteMessage(_sessionId!, message.id);
+        if (!mounted) return;
+        setState(() => _messages = _messages.where((m) => m.id != message.id).toList());
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_friendlyError(e))));
+      }
+    }
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
@@ -103,19 +267,6 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   String _friendlyError(Object e) => e is ApiException ? e.message : 'Something went wrong. Please try again.';
 
-  String _questionFor(String actionLabel) {
-    switch (actionLabel) {
-      case 'Speak to a Lawyer':
-        return 'I need help finding a lawyer for my situation. How does that work?';
-      case 'View Court Process':
-        return 'Can you explain the typical court process for a case like mine?';
-      case 'Draft Legal Notice':
-        return 'Can you help me draft a legal notice?';
-      default:
-        return actionLabel;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -123,11 +274,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const ScreenHeader(
-              title: 'AI Legal Assistant',
-              meta: 'Always active · Secure encryption',
-              verified: true,
-            ),
+            _ChatTopBar(onNewChat: _startNewChat, onHistory: _openHistory),
             Expanded(
               child: _loadingHistory
                   ? const Center(child: CircularProgressIndicator(color: AppColors.oxblood))
@@ -136,12 +283,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                       children: [
                         if (_error != null) LepErrorBanner(message: _error!),
-                        if (_messages.isEmpty) const _EmptyState(),
-                        for (final message in _messages) _MessageBubble(message: message),
-                        if (_sending) const _TypingBubble(),
-                        const SizedBox(height: 4),
-                        for (final action in assistantQuickActions)
-                          _QuickActionChip(action: action, onTap: () => _send(_questionFor(action.label))),
+                        if (_messages.isEmpty) _EmptyState(onPromptTap: (p) => _send(p)),
+                        for (final message in _messages)
+                          _MessageBubble(message: message, onLongPress: () => _onMessageLongPress(message)),
+                        if (_sending) const _TypingIndicator(),
+                        const SizedBox(height: 8),
                       ],
                     ),
             ),
@@ -153,21 +299,47 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+class _ChatTopBar extends StatelessWidget {
+  final VoidCallback onNewChat;
+  final VoidCallback onHistory;
+  const _ChatTopBar({required this.onNewChat, required this.onHistory});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+      decoration: const BoxDecoration(
+        color: AppColors.paper,
+        border: Border(bottom: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
         children: [
-          const Icon(LucideIcons.bot, size: 28, color: AppColors.brass),
-          const SizedBox(height: 10),
-          Text(
-            'Ask about Rwandan law — labour rights, land disputes, contracts, and more.',
-            textAlign: TextAlign.center,
-            style: AppText.body(size: 12.5, color: AppColors.inkSoft),
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: AppColors.oxblood, borderRadius: BorderRadius.circular(11)),
+            child: const Icon(LucideIcons.sparkles, size: 17, color: AppColors.paper),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Talk with Assistant', style: AppText.display(size: 16, weight: FontWeight.w700)),
+                Text('Grounded in Rwandan law', style: AppText.body(size: 11, color: AppColors.inkSoft)),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onHistory,
+            icon: const Icon(LucideIcons.history, size: 19, color: AppColors.ink),
+            tooltip: 'Chat history',
+          ),
+          IconButton(
+            onPressed: onNewChat,
+            icon: const Icon(LucideIcons.squarePen, size: 19, color: AppColors.ink),
+            tooltip: 'New chat',
           ),
         ],
       ),
@@ -175,72 +347,227 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _TypingBubble extends StatelessWidget {
-  const _TypingBubble();
+class _HistorySheet extends StatelessWidget {
+  final List<ApiSession> sessions;
+  final String? activeSessionId;
+  final ValueChanged<String> onSelect;
+  final ValueChanged<ApiSession> onRename;
+  final ValueChanged<ApiSession> onDelete;
+
+  const _HistorySheet({
+    required this.sessions,
+    required this.activeSessionId,
+    required this.onSelect,
+    required this.onRename,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(6, 14, 6, 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Chat history', style: AppText.display(size: 16, weight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Flexible(
+              child: sessions.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text('No conversations yet.', style: AppText.body(size: 12.5, color: AppColors.inkSoft)),
+                    )
+                  : ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: sessions.length,
+                      itemBuilder: (context, i) {
+                        final session = sessions[i];
+                        final active = session.id == activeSessionId;
+                        return ListTile(
+                          leading: Icon(
+                            LucideIcons.messageSquare,
+                            size: 18,
+                            color: active ? AppColors.oxblood : AppColors.slate,
+                          ),
+                          title: Text(
+                            session.title,
+                            style: AppText.body(size: 13.5, weight: active ? FontWeight.w700 : FontWeight.w500),
+                          ),
+                          onTap: () => onSelect(session.id),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(LucideIcons.pencil, size: 15, color: AppColors.slate),
+                                onPressed: () => onRename(session),
+                              ),
+                              IconButton(
+                                icon: const Icon(LucideIcons.trash2, size: 15, color: Colors.redAccent),
+                                onPressed: () => onDelete(session),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final ValueChanged<String> onPromptTap;
+  const _EmptyState({required this.onPromptTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      child: Column(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: AppColors.brassSoft, borderRadius: BorderRadius.circular(16)),
+            child: const Icon(LucideIcons.sparkles, size: 24, color: AppColors.oxblood),
+          ),
+          const SizedBox(height: 14),
+          Text('Ask about Rwandan law', style: AppText.display(size: 17, weight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            'Labour rights, land disputes, contracts, and more — grounded in real legal sources.',
+            textAlign: TextAlign.center,
+            style: AppText.body(size: 12.5, color: AppColors.inkSoft),
+          ),
+          const SizedBox(height: 18),
+          for (final prompt in _starterPrompts)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: () => onPromptTap(prompt),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.paperDim,
+                    border: Border.all(color: AppColors.line),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(LucideIcons.arrowUpRight, size: 14, color: AppColors.oxblood),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(prompt, style: AppText.body(size: 12.5, weight: FontWeight.w500)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TypingIndicator extends StatelessWidget {
+  const _TypingIndicator();
 
   @override
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-        decoration: BoxDecoration(
-          color: AppColors.paperDim,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: const SizedBox(
-          width: 16,
-          height: 16,
-          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.oxblood),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 14, left: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const _Avatar(),
+            const SizedBox(width: 10),
+            Text('Thinking…', style: AppText.body(size: 12.5, color: AppColors.inkSoft)),
+          ],
         ),
       ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: AppColors.oxblood, borderRadius: BorderRadius.circular(8)),
+      child: const Icon(LucideIcons.scale, size: 13, color: AppColors.paper),
     );
   }
 }
 
 class _MessageBubble extends StatelessWidget {
   final ApiMessage message;
-  const _MessageBubble({required this.message});
+  final VoidCallback onLongPress;
+  const _MessageBubble({required this.message, required this.onLongPress});
 
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: Column(
-        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
-            decoration: BoxDecoration(
-              color: isUser ? AppColors.oxblood : AppColors.paperDim,
-              border: isUser ? null : Border.all(color: AppColors.line),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(isUser ? 16 : 4),
-                topRight: Radius.circular(isUser ? 4 : 16),
-                bottomLeft: const Radius.circular(16),
-                bottomRight: const Radius.circular(16),
+      padding: const EdgeInsets.only(bottom: 18),
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+          children: [
+            if (!isUser) ...[const _Avatar(), const SizedBox(width: 10)],
+            Flexible(
+              child: Column(
+                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (isUser)
+                    Container(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.oxblood,
+                        borderRadius: BorderRadius.circular(18).copyWith(
+                          bottomRight: const Radius.circular(4),
+                        ),
+                      ),
+                      child: Text(
+                        message.content,
+                        style: AppText.body(size: 13.5, color: AppColors.paper).copyWith(height: 1.5),
+                      ),
+                    )
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          message.content,
+                          style: AppText.body(size: 13.5, color: AppColors.ink).copyWith(height: 1.6),
+                        ),
+                        for (final citation in message.citations) ApiCitationBlockWidget(citation: citation),
+                      ],
+                    ),
+                  const SizedBox(height: 4),
+                  Text(_formatTime(message.createdAt), style: AppText.mono(size: 10, color: AppColors.slate)),
+                ],
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.content,
-                  style: AppText
-                      .body(size: 13.5, color: isUser ? AppColors.paper : AppColors.ink)
-                      .copyWith(height: 1.5),
-                ),
-                for (final citation in message.citations) ApiCitationBlockWidget(citation: citation),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(_formatTime(message.createdAt), style: AppText.mono(size: 10, color: AppColors.slate)),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -255,39 +582,6 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-class _QuickActionChip extends StatelessWidget {
-  final QuickAction action;
-  final VoidCallback onTap;
-  const _QuickActionChip({required this.action, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: SizedBox(
-        width: double.infinity,
-        child: OutlinedButton.icon(
-          onPressed: onTap,
-          icon: Icon(action.icon, size: 15, color: AppColors.oxbloodDeep),
-          label: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              action.label,
-              style: AppText.body(size: 12.5, weight: FontWeight.w600, color: AppColors.oxbloodDeep),
-            ),
-          ),
-          style: OutlinedButton.styleFrom(
-            backgroundColor: AppColors.oxblood.withValues(alpha: 0.05),
-            side: const BorderSide(color: AppColors.oxblood),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
@@ -297,20 +591,16 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 12, 14, 16),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
       decoration: const BoxDecoration(
         color: AppColors.paper,
         border: Border(top: BorderSide(color: AppColors.line)),
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(LucideIcons.plus, size: 18, color: AppColors.inkSoft),
-          ),
           Expanded(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
                 color: AppColors.paperDim,
                 borderRadius: BorderRadius.circular(999),
@@ -318,28 +608,22 @@ class _Composer extends StatelessWidget {
               ),
               child: TextField(
                 controller: controller,
-                style: AppText.body(size: 12.5),
+                style: AppText.body(size: 13),
+                minLines: 1,
+                maxLines: 5,
                 onSubmitted: (_) => onSend(),
                 textInputAction: TextInputAction.send,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Ask a legal question…',
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: EdgeInsets.symmetric(vertical: 13),
                 ),
               ),
             ),
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(LucideIcons.paperclip, size: 16, color: AppColors.inkSoft),
-          ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(LucideIcons.mic, size: 16, color: AppColors.inkSoft),
-          ),
+          const SizedBox(width: 8),
           Container(
-            margin: const EdgeInsets.only(left: 2),
             decoration: const BoxDecoration(color: AppColors.oxblood, shape: BoxShape.circle),
             child: IconButton(
               onPressed: sending ? null : onSend,
@@ -349,7 +633,7 @@ class _Composer extends StatelessWidget {
                       height: 14,
                       child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.paper),
                     )
-                  : const Icon(LucideIcons.send, size: 16, color: AppColors.paper),
+                  : const Icon(LucideIcons.arrowUp, size: 18, color: AppColors.paper),
             ),
           ),
         ],

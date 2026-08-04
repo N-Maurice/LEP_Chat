@@ -13,9 +13,10 @@ import 'screens/auth/sign_in_screen.dart';
 import 'screens/auth/sign_up_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/case_tracking_screen.dart';
+import 'screens/community_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/legal_education_screen.dart';
 import 'screens/profile_screen.dart';
-import 'screens/research_hub_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -121,9 +122,9 @@ class _NavItem {
   const _NavItem(this.icon, this.label);
 }
 
-/// The signed-in shell: bottom nav across Home, AI Search (Research Hub),
-/// Cases, Community, and Profile. The AI Legal Assistant chat is reached via
-/// Home's floating action button, matching the mockup's chat bubble.
+/// The signed-in shell: bottom nav across Home, Talk with Assistant (the AI
+/// Legal Assistant chat), Cases, Education (courses + legal research), and
+/// Profile. Community (direct messages) is reached from Home's Quick Actions.
 class LepHomeShell extends StatefulWidget {
   const LepHomeShell({super.key});
 
@@ -136,23 +137,24 @@ class _LepHomeShellState extends State<LepHomeShell> {
 
   static const List<_NavItem> _navItems = [
     _NavItem(LucideIcons.home, 'Home'),
-    _NavItem(LucideIcons.bot, 'AI Search'),
+    _NavItem(LucideIcons.messageCircle, 'Talk with Assistant'),
     _NavItem(LucideIcons.scale, 'Cases'),
-    _NavItem(LucideIcons.users, 'Community'),
+    _NavItem(LucideIcons.graduationCap, 'Education'),
     _NavItem(LucideIcons.user, 'Profile'),
   ];
-
-  void _openAssistant() {
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AiAssistantScreen()));
-  }
 
   @override
   Widget build(BuildContext context) {
     final screens = [
-      HomeScreen(onNavigateToTab: (i) => setState(() => _index = i), onOpenAssistant: _openAssistant),
-      const ResearchHubScreen(),
+      HomeScreen(
+        onNavigateToTab: (i) => setState(() => _index = i),
+        onOpenCommunity: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CommunityScreen()),
+        ),
+      ),
+      const AiAssistantScreen(),
       const CaseTrackingScreen(),
-      const _ComingSoonScreen(title: 'Community'),
+      const LegalEducationScreen(),
       const ProfileScreen(),
     ];
 
@@ -171,32 +173,6 @@ class _LepHomeShellState extends State<LepHomeShell> {
           for (final item in _navItems)
             BottomNavigationBarItem(icon: Icon(item.icon), label: item.label),
         ],
-      ),
-    );
-  }
-}
-
-/// Placeholder for modules not yet built, so the nav bar reflects the
-/// full 9-module vision without dead taps.
-class _ComingSoonScreen extends StatelessWidget {
-  final String title;
-  const _ComingSoonScreen({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(LucideIcons.hammer, size: 28, color: AppColors.brass),
-            const SizedBox(height: 10),
-            Text('$title module', style: AppText.display(size: 17, weight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text('In the build queue — coming soon.', style: AppText.body(size: 12.5, color: AppColors.inkSoft)),
-          ],
-        ),
       ),
     );
   }

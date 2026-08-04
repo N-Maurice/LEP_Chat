@@ -76,11 +76,10 @@ class _SignInScreenState extends State<SignInScreen> {
                   validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
                 ),
                 const SizedBox(height: 16),
-                LepFormField(
+                LepPasswordField(
                   label: 'Password',
                   controller: _password,
                   hint: '••••••••••••',
-                  obscureText: true,
                   validator: (v) => (v == null || v.isEmpty) ? 'Enter your password' : null,
                 ),
                 const SizedBox(height: 24),
