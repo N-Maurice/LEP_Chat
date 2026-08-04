@@ -48,7 +48,6 @@ Flutter (Provider)  ──REST + Firebase ID token──>  FastAPI  ──>  Fir
 - **Data**: Cloud Firestore for all structured data, Cloud Storage for ingested legal-document PDFs and citizen-submitted evidence (served back as short-lived signed URLs, never public links).
 - **AI**: Vertex AI's `text-embedding-005` for embeddings and `gemini-2.5-flash` for generation, via the `google-genai` SDK.
 
-See [`docs/LEP_Chat_Final_Report.pdf`](docs/LEP_Chat_Final_Report.pdf) for the full implementation report, including the data model, security model, and real screenshots of every screen.
 
 ## Repository Structure
 
@@ -89,7 +88,8 @@ LEP_Chat/
 
 ## Prerequisites
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (3.10+)
+- Installing Flutter SDK (https://docs.flutter.dev/get-started/install)
+- Application apk (https://drive.google.com/drive/folders/1RJX2nL3w9G7NTPVKBZebVFif5T9fJXe5?usp=sharing (3.10+))
 - Python 3.13
 - A Firebase project with Authentication (Email/Password + Google) and Firestore enabled
 - A Firebase service-account JSON key (for the backend) — **never commit this file**; it's gitignored
@@ -162,7 +162,7 @@ flutter analyze
 
 ## Deployment
 
-The backend is deployed on [Render](https://render.com) at `https://lep-chat.onrender.com`. Its start command binds explicitly to `0.0.0.0:$PORT` (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`), and the Firebase service-account key is uploaded through Render's **Secret Files**, never committed to the repository. The mobile app's `.env.json` is switched between the local and deployed URL depending on environment.
+The backend is deployed on [Render](https://lep-chat.onrender.com/docs) at `https://lep-chat.onrender.com`. Its start command binds explicitly to `0.0.0.0:$PORT` (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`), and the Firebase service-account key is uploaded through Render's **Secret Files**, never committed to the repository. The mobile app's `.env.json` is switched between the local and deployed URL depending on environment.
 
 ## Authors
 
@@ -171,6 +171,3 @@ The backend is deployed on [Render](https://render.com) at `https://lep-chat.onr
 - Nshimyumukiza Maurice
 - Boussamba Quenum Joseph
 - Grace Umwari
-
-Repository: [github.com/N-Maurice/LEP_Chat](https://github.com/N-Maurice/LEP_Chat)
-Demo video: https://youtu.be/oAn5mUAuBaI
